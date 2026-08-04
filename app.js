@@ -431,7 +431,11 @@ function renderArsipSection() {
             <td class="px-5 py-4 text-center text-sm">
               <div class="flex items-center justify-center gap-1">
                 <button title="Lihat Detail" class="p-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-100" data-view="${escapeHtml(a.id)}">👁</button>
+                <button title="Print/Download Resume" class="p-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-100" data-print-row="${escapeHtml(a.id)}">🖨</button>
                 <button title="Edit" class="p-1.5 bg-amber-50 text-amber-600 rounded hover:bg-amber-100" data-edit="${escapeHtml(a.id)}">✏️</button>
+                ${a.status === 'Dipinjam'
+                  ? `<button title="Kembalikan Arsip" class="p-1.5 bg-green-50 text-green-600 rounded hover:bg-green-100" data-return="${escapeHtml(a.id)}">↩️</button>`
+                  : `<button title="Rekam Peminjaman" class="p-1.5 bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100" data-borrow="${escapeHtml(a.id)}">📗</button>`}
               </div>
             </td>
           </tr>
@@ -443,8 +447,24 @@ function renderArsipSection() {
   wrap.querySelectorAll('[data-view]').forEach(btn => {
     btn.onclick = () => openDetailModal(state.arsip.find(a => String(a.id) === btn.dataset.view));
   });
+  wrap.querySelectorAll('[data-print-row]').forEach(btn => {
+    btn.onclick = () => {
+      openDetailModal(state.arsip.find(a => String(a.id) === btn.dataset.printRow));
+      setTimeout(() => window.print(), 400);
+    };
+  });
   wrap.querySelectorAll('[data-edit]').forEach(btn => {
     btn.onclick = () => openArsipFormModal('edit', state.arsip.find(a => String(a.id) === btn.dataset.edit));
+  });
+  wrap.querySelectorAll('[data-borrow]').forEach(btn => {
+    btn.onclick = () => openPinjamModal(btn.dataset.borrow);
+  });
+  wrap.querySelectorAll('[data-return]').forEach(btn => {
+    btn.onclick = () => {
+      const archive = state.arsip.find(a => String(a.id) === btn.dataset.return);
+      const active = (archive.peminjaman || []).find(p => !p.tanggalKembali);
+      if (active) returnPeminjaman(archive.id, active.id);
+    };
   });
 
   renderPaginationControls('arsip-pagination', filtered.length, state.pageArsip, state.perPageArsip,
