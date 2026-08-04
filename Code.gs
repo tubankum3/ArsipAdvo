@@ -91,108 +91,6 @@ function assertAuthorized_(token) {
   }
 }
 
-// ====== EMAIL NOTIFICATIONS ======
-// Configure via the Apps Script editor: Project Settings (gear icon) >
-// Script Properties > Add script property.
-//
-//   NOTIFY_EMAIL           Required to enable notifications at all.
-//                           Comma-separated recipient address(es). Leave
-//                           unset to keep the app silent (default).
-//   NOTIFY_BORROW_SUBJECT  Optional. Default shown below.
-//   NOTIFY_BORROW_MESSAGE  Optional. Placeholders: {nomorPerkara}
-//                           {jenisPerkara} {peminjam} {tanggalPinjam}
-//                           {lokasiSimpan} {keterangan}
-//   NOTIFY_RETURN_SUBJECT  Optional. Default shown below.
-//   NOTIFY_RETURN_MESSAGE  Optional. Placeholders: {nomorPerkara}
-//                           {jenisPerkara} {peminjam} {tanggalPinjam}
-//                           {tanggalKembali} {keterangan}
-//
-// Run sendTestEmail() from the Run menu any time to confirm delivery
-// actually works before relying on it. A failed send never blocks the
-// borrow/return action itself — it's only logged (View > Logs).
-
-function getScriptProp_(key, fallback) {
-  var v = PropertiesService.getScriptProperties().getProperty(key);
-  return (v === null || v === '') ? fallback : v;
-}
-
-function renderTemplate_(template, data) {
-  return template.replace(/\{(\w+)\}/g, function (match, key) {
-    var val = data[key];
-    return (val !== undefined && val !== null && val !== '') ? val : '-';
-  });
-}
-
-/**
- * Sends an email if NOTIFY_EMAIL is configured; otherwise does nothing.
- * This is the one place mail actually gets sent — everything else in this
- * section builds the subject/body and calls through here.
- */
-function sendEmailNotification_(subject, message) {
-  var recipients = getScriptProp_('NOTIFY_EMAIL', '');
-  if (!recipients) return;
-  try {
-    MailApp.sendEmail({ to: recipients, subject: subject, body: message });
-  } catch (err) {
-    Logger.log('Email notification failed: ' + err.message);
-  }
-}
-
-function notifyBorrow_(entry, archive) {
-  var data = {
-    nomorPerkara: archive.nomorPerkara,
-    jenisPerkara: archive.jenisPerkara,
-    peminjam: entry.peminjam,
-    tanggalPinjam: entry.tanggalPinjam,
-    lokasiSimpan: archive.lokasiSimpan,
-    keterangan: entry.keterangan
-  };
-  var subject = renderTemplate_(getScriptProp_('NOTIFY_BORROW_SUBJECT', 'Peminjaman Arsip: {nomorPerkara}'), data);
-  var message = renderTemplate_(getScriptProp_('NOTIFY_BORROW_MESSAGE',
-    'Arsip berikut telah dipinjam:\n\n' +
-    'Nomor Perkara  : {nomorPerkara}\n' +
-    'Jenis Perkara  : {jenisPerkara}\n' +
-    'Peminjam       : {peminjam}\n' +
-    'Tanggal Pinjam : {tanggalPinjam}\n' +
-    'Lokasi Simpan  : {lokasiSimpan}\n' +
-    'Keterangan     : {keterangan}\n'
-  ), data);
-  sendEmailNotification_(subject, message);
-}
-
-function notifyReturn_(entry, archive) {
-  var data = {
-    nomorPerkara: archive.nomorPerkara,
-    jenisPerkara: archive.jenisPerkara,
-    peminjam: entry.peminjam,
-    tanggalPinjam: entry.tanggalPinjam,
-    tanggalKembali: entry.tanggalKembali,
-    keterangan: entry.keterangan
-  };
-  var subject = renderTemplate_(getScriptProp_('NOTIFY_RETURN_SUBJECT', 'Pengembalian Arsip: {nomorPerkara}'), data);
-  var message = renderTemplate_(getScriptProp_('NOTIFY_RETURN_MESSAGE',
-    'Arsip berikut telah dikembalikan:\n\n' +
-    'Nomor Perkara   : {nomorPerkara}\n' +
-    'Jenis Perkara   : {jenisPerkara}\n' +
-    'Peminjam        : {peminjam}\n' +
-    'Tanggal Pinjam  : {tanggalPinjam}\n' +
-    'Tanggal Kembali : {tanggalKembali}\n'
-  ), data);
-  sendEmailNotification_(subject, message);
-}
-
-/** Run manually from the Apps Script editor to test your NOTIFY_EMAIL setup. */
-function sendTestEmail() {
-  var recipients = getScriptProp_('NOTIFY_EMAIL', '');
-  if (!recipients) {
-    throw new Error('Set the NOTIFY_EMAIL script property first (Project Settings > Script Properties).');
-  }
-  sendEmailNotification_(
-    'Uji Coba Notifikasi — Manajemen Arsip',
-    'Ini adalah email uji coba. Jika Anda menerima email ini, notifikasi sudah berfungsi dengan benar.'
-  );
-}
-
 // ====== HTTP ENTRY POINTS ======
 
 function doGet(e) {
@@ -200,13 +98,36 @@ function doGet(e) {
     assertAuthorized_(e.parameter.token);
     var action = e.parameter.action;
     var data;
-    if (action === 'perkaraSelesai') {
+    if (action === 'allData') {
+      var perkara = getObjects_(SHEET_PERKARA);
+      var arsip = getObjects_(SHEET_ARSIP);
+      var peminjaman = getObjects_(SHEET_PEMINJAMAN);
+      var peminjamanMap = {};
+      for (var i = 0; i < peminjaman.length; i++) {
+        var p = peminjaman[i];
+        if (!peminjamanMap[p.arsipId]) peminjamanMap[p.arsipId] = [];
+        peminjamanMap[p.arsipId].push(p);
+      }
+      data = {
+        perkara: perkara,
+        arsip: arsip.map(function (a) {
+          a.peminjaman = peminjamanMap[a.id] || [];
+          return a;
+        })
+      };
+    } else if (action === 'perkaraSelesai') {
       data = getObjects_(SHEET_PERKARA);
     } else if (action === 'arsip') {
       var arsip = getObjects_(SHEET_ARSIP);
       var peminjaman = getObjects_(SHEET_PEMINJAMAN);
+      var peminjamanMap = {};
+      for (var i = 0; i < peminjaman.length; i++) {
+        var p = peminjaman[i];
+        if (!peminjamanMap[p.arsipId]) peminjamanMap[p.arsipId] = [];
+        peminjamanMap[p.arsipId].push(p);
+      }
       data = arsip.map(function (a) {
-        a.peminjaman = peminjaman.filter(function (p) { return String(p.arsipId) === String(a.id); });
+        a.peminjaman = peminjamanMap[a.id] || [];
         return a;
       });
     } else {
@@ -253,13 +174,19 @@ function getObjects_(name) {
   var lastRow = ref.sh.getLastRow();
   if (lastRow < 2) return [];
   var values = ref.sh.getRange(2, 1, lastRow - 1, ref.headers.length).getValues();
-  return values
-    .map(function (row) {
-      var obj = {};
-      ref.headers.forEach(function (h, i) { obj[h] = row[i]; });
-      return obj;
-    })
-    .filter(function (o) { return o.id !== '' && o.id !== null; });
+  var idIndex = ref.headers.indexOf('id');
+  var result = [];
+  for (var r = 0; r < values.length; r++) {
+    var row = values[r];
+    var id = row[idIndex];
+    if (id === '' || id === null) continue;
+    var obj = {};
+    for (var i = 0; i < ref.headers.length; i++) {
+      obj[ref.headers[i]] = row[i];
+    }
+    result.push(obj);
+  }
+  return result;
 }
 
 function findRowIndexById_(sh, headers, id) {
@@ -351,8 +278,6 @@ function addPeminjaman_(body) {
   if (arsipRow !== -1) {
     var statusCol = arsipRef.headers.indexOf('status') + 1;
     arsipRef.sh.getRange(arsipRow, statusCol).setValue('Dipinjam');
-    var archiveObj = rowToObject_(arsipRef.sh, arsipRef.headers, arsipRow);
-    notifyBorrow_(entry, archiveObj);
   }
   return entry;
 }
@@ -365,25 +290,19 @@ function returnPeminjaman_(body) {
   var todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
   var col = ref.headers.indexOf('tanggalKembali') + 1;
   ref.sh.getRange(rowIndex, col).setValue(todayStr);
-  var entryObj = rowToObject_(ref.sh, ref.headers, rowIndex);
-
-  var arsipRef = getSheetAndHeaders_(SHEET_ARSIP);
-  var arsipRow = findRowIndexById_(arsipRef.sh, arsipRef.headers, body.arsipId);
 
   // If no other open (un-returned) borrow exists for this archive, mark it available again.
   var allPeminjaman = getObjects_(SHEET_PEMINJAMAN);
   var stillOpen = allPeminjaman.some(function (p) {
     return String(p.arsipId) === String(body.arsipId) && String(p.id) !== String(body.peminjamanId) && !p.tanggalKembali;
   });
-  if (!stillOpen && arsipRow !== -1) {
-    var statusCol = arsipRef.headers.indexOf('status') + 1;
-    arsipRef.sh.getRange(arsipRow, statusCol).setValue('Terarsip');
+  if (!stillOpen) {
+    var arsipRef = getSheetAndHeaders_(SHEET_ARSIP);
+    var arsipRow = findRowIndexById_(arsipRef.sh, arsipRef.headers, body.arsipId);
+    if (arsipRow !== -1) {
+      var statusCol = arsipRef.headers.indexOf('status') + 1;
+      arsipRef.sh.getRange(arsipRow, statusCol).setValue('Terarsip');
+    }
   }
-
-  if (arsipRow !== -1) {
-    var archiveObj = rowToObject_(arsipRef.sh, arsipRef.headers, arsipRow);
-    notifyReturn_(entryObj, archiveObj);
-  }
-
   return { id: body.peminjamanId, tanggalKembali: todayStr };
 }
