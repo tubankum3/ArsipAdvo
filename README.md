@@ -2,10 +2,18 @@
 
 A static web app (deployable on GitHub Pages) for managing completed-case
 archives and their borrowing history, using a Google Sheet as the database.
-This is a re-implementation of the reference `Arsip.tsx` component — same
-two tables, same archive / edit / view / print / borrow / return workflow —
-built without a React build step so it can be hosted directly on GitHub
+Built without a React build step so it can be hosted directly on GitHub
 Pages.
+
+The app has two top-level views, switched from the nav bar:
+
+- **Peminjaman** — the default view. Dashboard stats (total / dipinjam /
+  tersedia) plus a single table of every archived case, for recording and
+  returning borrows day-to-day.
+- **Arsiparis** — record-keeping. Two sub-tabs: **Daftar Perkara** (cases
+  ready to be archived — "Arsipkan" moves one into the archive) and
+  **Daftar Arsip** (view/edit archived case metadata; no borrowing actions
+  here, since that's handled in the Peminjaman view).
 
 ## How it works
 
@@ -105,14 +113,54 @@ next page load.
 
 ## Feature mapping
 
-| Original component | This app |
+| Feature | Where it lives |
 |---|---|
-| `Arsip` list state | `PerkaraSelesai` / `ArsipPerkaraSelesai` sheets |
-| "Record ke Arsip" modal | Archive form modal → `archive` action |
-| Edit archive modal | Same form, prefilled → `updateArsip` action |
-| Detail view + print | Detail modal, `window.print()` scoped to the modal |
-| Borrowing mechanism | `Peminjaman` sheet, `addPeminjaman` / `returnPeminjaman` actions |
+| Case data | `PerkaraSelesai` / `ArsipPerkaraSelesai` sheets |
+| "Arsipkan" (record to archive) | Arsiparis > Daftar Perkara → `archive` action |
+| Edit archive metadata | Arsiparis > Daftar Arsip → `updateArsip` action |
+| Detail view + print | Detail modal (either view), `window.print()` scoped to the modal |
+| Borrowing / returning | Peminjaman view, `Peminjaman` sheet, `addPeminjaman` / `returnPeminjaman` actions |
+| Dashboard stats | Peminjaman view, computed client-side from the fetched `arsip` list |
 | Client-side pagination/search | Same, done in `app.js` over the fetched rows |
+| Email notifications | Sent server-side from `Code.gs` on borrow/return — see below |
+
+## Email notifications
+
+`Code.gs` can send an email automatically whenever a case is borrowed or
+returned. It's off by default — nothing is sent until you configure it.
+
+### Turn it on
+
+1. In the Apps Script editor, click the gear icon (**Project Settings**) in the left sidebar.
+2. Scroll to **Script Properties > Add script property**.
+3. Add a property named `NOTIFY_EMAIL` with the recipient address as the value. You can list more than one, comma-separated (e.g. `arsiparis@example.org, kepala@example.org`).
+4. Save.
+
+That's the only required step. From now on:
+- Recording a borrow (Peminjaman view → 📗) sends an email with the case number, borrower, date, and location.
+- Recording a return (↩️) sends a confirmation email with the same details plus the return date.
+
+### Test it
+
+In the Apps Script editor's function dropdown, select **sendTestEmail** and click **Run**. If `NOTIFY_EMAIL` is set correctly you'll get a short test message; if not, it throws a clear error telling you to set the property first.
+
+### Customize the message (optional)
+
+Add any of these additional Script Properties to override the defaults:
+
+| Property | Default | Notes |
+|---|---|---|
+| `NOTIFY_BORROW_SUBJECT` | `Peminjaman Arsip: {nomorPerkara}` | |
+| `NOTIFY_BORROW_MESSAGE` | See `notifyBorrow_` in `Code.gs` | Placeholders: `{nomorPerkara} {jenisPerkara} {peminjam} {tanggalPinjam} {lokasiSimpan} {keterangan}` |
+| `NOTIFY_RETURN_SUBJECT` | `Pengembalian Arsip: {nomorPerkara}` | |
+| `NOTIFY_RETURN_MESSAGE` | See `notifyReturn_` in `Code.gs` | Placeholders: `{nomorPerkara} {jenisPerkara} {peminjam} {tanggalPinjam} {tanggalKembali} {keterangan}` |
+
+A placeholder is replaced with `-` if that field happens to be empty.
+
+### Limits worth knowing
+
+- `MailApp.sendEmail` runs under **your** Google account's daily quota (100/day on a plain Gmail account, higher on Google Workspace). Fine for a case archive's borrow/return volume, but keep it in mind.
+- If a send fails (quota, bad address, etc.), the borrow/return itself still succeeds — the app never blocks on email. Check **Executions** in the Apps Script editor to see any delivery errors.
 
 ## Security note (please read)
 
@@ -139,3 +187,4 @@ auth layer in front of it) before using it in production.
 - **Fetch fails / CORS error in the console** — most often this means you edited `Code.gs` but didn't create a new deployment version (see step 2). Re-deploy and try again.
 - **"Sheet not found" error** — run `setupSheets` from the Apps Script editor first.
 - **Data doesn't look right after an edit** — double check the sheet's header row still exactly matches the columns listed above; the API maps columns by header name.
+- **No email arriving** — run `sendTestEmail` from the Apps Script editor first to isolate the problem to configuration vs. delivery. Check spam, and check **Executions** (left sidebar) for errors. Remember step 2 above: every `Code.gs` edit needs a new deployment version to take effect.

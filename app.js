@@ -1,18 +1,83 @@
 // ====== STATE ======
 const state = {
+  activeView: 'peminjaman',
   perkara: [],
   arsip: [],
   searchPerkara: '',
   searchArsip: '',
+  searchPeminjaman: '',
   pagePerkara: 1,
   pageArsip: 1,
+  pagePeminjaman: 1,
   perPagePerkara: 10,
   perPageArsip: 10,
+  perPagePeminjaman: 10,
   loadingPerkara: true,
   loadingArsip: true,
   errorPerkara: null,
   errorArsip: null
 };
+
+// ====== NAVIGATION & DASHBOARD ======
+function switchView(viewName) {
+  state.activeView = viewName;
+  document.getElementById('view-peminjaman').classList.toggle('hidden', viewName !== 'peminjaman');
+  document.getElementById('view-arsiparis').classList.toggle('hidden', viewName !== 'arsiparis');
+
+  const btnPeminjaman = document.getElementById('nav-peminjaman');
+  const btnArsiparis = document.getElementById('nav-arsiparis');
+
+  if (viewName === 'peminjaman') {
+    btnPeminjaman.className = "nav-btn bg-blue-800 text-white px-3 py-2 rounded-md text-sm font-medium transition-colors";
+    btnArsiparis.className = "nav-btn text-blue-100 hover:bg-blue-600 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors";
+    renderPeminjamanSection();
+    renderStats();
+  } else {
+    btnArsiparis.className = "nav-btn bg-blue-800 text-white px-3 py-2 rounded-md text-sm font-medium transition-colors";
+    btnPeminjaman.className = "nav-btn text-blue-100 hover:bg-blue-600 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors";
+    renderPerkaraSection();
+    renderArsipSection();
+  }
+}
+
+function renderStats() {
+  if (!state.arsip) return;
+  const totalArsip = state.arsip.length;
+  const dipinjam = state.arsip.filter(a => a.status === 'Dipinjam').length;
+  const tersedia = totalArsip - dipinjam;
+
+  document.getElementById('stat-total-arsip').textContent = totalArsip;
+  document.getElementById('stat-dipinjam').textContent = dipinjam;
+  document.getElementById('stat-tersedia').textContent = tersedia;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('nav-peminjaman').addEventListener('click', () => switchView('peminjaman'));
+  document.getElementById('nav-arsiparis').addEventListener('click', () => switchView('arsiparis'));
+  
+  // Arsiparis Tabs
+  document.getElementById('tab-perkara').addEventListener('click', () => switchArsiparisTab('perkara'));
+  document.getElementById('tab-arsip').addEventListener('click', () => switchArsiparisTab('arsip'));
+});
+
+function switchArsiparisTab(tabName) {
+  const tabPerkara = document.getElementById('tab-perkara');
+  const tabArsip = document.getElementById('tab-arsip');
+  const contentPerkara = document.getElementById('tab-content-perkara');
+  const contentArsip = document.getElementById('tab-content-arsip');
+
+  if (tabName === 'perkara') {
+    tabPerkara.className = "border-blue-600 text-blue-600 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors";
+    tabArsip.className = "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors";
+    contentPerkara.classList.remove('hidden');
+    contentArsip.classList.add('hidden');
+  } else {
+    tabArsip.className = "border-blue-600 text-blue-600 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors";
+    tabPerkara.className = "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors";
+    contentArsip.classList.remove('hidden');
+    contentPerkara.classList.add('hidden');
+  }
+}
 
 // ====== SMALL HELPERS ======
 function escapeHtml(str) {
@@ -82,6 +147,7 @@ async function fetchArsip() {
   state.loadingArsip = true;
   state.errorArsip = null;
   renderArsipSection();
+  renderPeminjamanSection();
   try {
     state.arsip = await apiGet('arsip');
   } catch (err) {
@@ -89,6 +155,8 @@ async function fetchArsip() {
   } finally {
     state.loadingArsip = false;
     renderArsipSection();
+    renderPeminjamanSection();
+    renderStats();
   }
 }
 
@@ -204,7 +272,99 @@ document.addEventListener('input', (e) => {
     state.pageArsip = 1;
     renderArsipSection();
   }
+  if (e.target.id === 'search-peminjaman') {
+    state.searchPeminjaman = e.target.value;
+    state.pagePeminjaman = 1;
+    renderPeminjamanSection();
+  }
 });
+
+// ====== TABLE: DAFTAR PEMINJAMAN ARSIP ======
+function getFilteredPeminjaman() {
+  const term = state.searchPeminjaman.toLowerCase();
+  return state.arsip.filter(a =>
+    (a.nomorPerkara || '').toLowerCase().includes(term) ||
+    (a.jenisPerkara || '').toLowerCase().includes(term)
+  );
+}
+
+function renderPeminjamanSection() {
+  const wrap = document.getElementById('peminjaman-table-wrap');
+  if (!wrap) return; // guard if not on page
+
+  if (state.loadingArsip) {
+    wrap.innerHTML = `<div class="flex items-center justify-center py-10 gap-2 text-gray-500 text-sm"><div class="spinner"></div>Memuat data...</div>`;
+    document.getElementById('peminjaman-pagination').innerHTML = '';
+    return;
+  }
+  if (state.errorArsip) {
+    wrap.innerHTML = `<div class="p-6 text-sm text-red-600">Gagal memuat data: ${escapeHtml(state.errorArsip)}</div>`;
+    document.getElementById('peminjaman-pagination').innerHTML = '';
+    return;
+  }
+
+  const filtered = getFilteredPeminjaman();
+  const totalPages = Math.max(1, Math.ceil(filtered.length / state.perPagePeminjaman));
+  if (state.pagePeminjaman > totalPages) state.pagePeminjaman = totalPages;
+  const rows = paginate(filtered, state.pagePeminjaman, state.perPagePeminjaman);
+
+  wrap.innerHTML = `
+    <table class="min-w-full">
+      <thead class="bg-[#fcfcfc] border-b border-gray-200">
+        <tr>
+          <th class="px-5 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-16 border-r border-gray-200">No</th>
+          <th class="px-5 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200">Nomor Perkara</th>
+          <th class="px-5 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200">Jenis</th>
+          <th class="px-5 py-4 text-center text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200">Masuk</th>
+          <th class="px-5 py-4 text-center text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200">Selesai</th>
+          <th class="px-5 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200">Status</th>
+          <th class="px-5 py-4 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Aksi Peminjaman</th>
+        </tr>
+      </thead>
+      <tbody class="bg-white divide-y divide-gray-100">
+        ${rows.length === 0 ? `
+          <tr><td colspan="7" class="px-5 py-12 text-sm text-gray-500 font-medium text-center italic">Belum ada data arsip terekam.</td></tr>
+        ` : rows.map((a, i) => `
+          <tr class="hover:bg-gray-50 transition-colors">
+            <td class="px-5 py-4 text-sm text-gray-800 border-r border-gray-200">${(state.pagePeminjaman - 1) * state.perPagePeminjaman + i + 1}</td>
+            <td class="px-5 py-4 text-sm text-gray-800 border-r border-gray-200 font-medium">${escapeHtml(a.nomorPerkara)}</td>
+            <td class="px-5 py-4 text-sm text-gray-800 border-r border-gray-200">${escapeHtml(a.jenisPerkara)}</td>
+            <td class="px-5 py-4 text-sm text-gray-800 border-r border-gray-200 text-center">${escapeHtml(a.tahunMasuk)}</td>
+            <td class="px-5 py-4 text-sm text-gray-800 border-r border-gray-200 text-center">${escapeHtml(a.tahunSelesai)}</td>
+            <td class="px-5 py-4 text-sm text-gray-800 border-r border-gray-200">${statusBadge(a.status)}</td>
+            <td class="px-5 py-4 text-center text-sm">
+              <div class="flex items-center justify-center gap-1">
+                <button title="Lihat Detail" class="p-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-100" data-view="${escapeHtml(a.id)}">👁</button>
+                ${a.status === 'Dipinjam'
+                  ? `<button title="Kembalikan Arsip" class="p-1.5 bg-green-50 text-green-600 rounded hover:bg-green-100" data-return="${escapeHtml(a.id)}">↩️</button>`
+                  : `<button title="Rekam Peminjaman" class="p-1.5 bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100" data-borrow="${escapeHtml(a.id)}">📗</button>`}
+              </div>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+
+  wrap.querySelectorAll('[data-view]').forEach(btn => {
+    btn.onclick = () => openDetailModal(state.arsip.find(a => String(a.id) === btn.dataset.view));
+  });
+  wrap.querySelectorAll('[data-borrow]').forEach(btn => {
+    btn.onclick = () => openPinjamModal(btn.dataset.borrow);
+  });
+  wrap.querySelectorAll('[data-return]').forEach(btn => {
+    btn.onclick = () => {
+      const archive = state.arsip.find(a => String(a.id) === btn.dataset.return);
+      const active = (archive.peminjaman || []).find(p => !p.tanggalKembali);
+      if (active) returnPeminjaman(archive.id, active.id);
+    };
+  });
+
+  renderPaginationControls('peminjaman-pagination', filtered.length, state.pagePeminjaman, state.perPagePeminjaman,
+    (page) => { state.pagePeminjaman = page; renderPeminjamanSection(); },
+    (perPage) => { state.perPagePeminjaman = perPage; state.pagePeminjaman = 1; renderPeminjamanSection(); }
+  );
+}
 
 // ====== TABLE 2: DAFTAR ARSIP PERKARA SELESAI ======
 function getFilteredArsip() {
@@ -272,9 +432,6 @@ function renderArsipSection() {
               <div class="flex items-center justify-center gap-1">
                 <button title="Lihat Detail" class="p-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-100" data-view="${escapeHtml(a.id)}">👁</button>
                 <button title="Edit" class="p-1.5 bg-amber-50 text-amber-600 rounded hover:bg-amber-100" data-edit="${escapeHtml(a.id)}">✏️</button>
-                ${a.status === 'Dipinjam'
-                  ? `<button title="Kembalikan Arsip" class="p-1.5 bg-green-50 text-green-600 rounded hover:bg-green-100" data-return="${escapeHtml(a.id)}">↩️</button>`
-                  : `<button title="Rekam Peminjaman" class="p-1.5 bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100" data-borrow="${escapeHtml(a.id)}">📗</button>`}
               </div>
             </td>
           </tr>
@@ -288,16 +445,6 @@ function renderArsipSection() {
   });
   wrap.querySelectorAll('[data-edit]').forEach(btn => {
     btn.onclick = () => openArsipFormModal('edit', state.arsip.find(a => String(a.id) === btn.dataset.edit));
-  });
-  wrap.querySelectorAll('[data-borrow]').forEach(btn => {
-    btn.onclick = () => openPinjamModal(btn.dataset.borrow);
-  });
-  wrap.querySelectorAll('[data-return]').forEach(btn => {
-    btn.onclick = () => {
-      const archive = state.arsip.find(a => String(a.id) === btn.dataset.return);
-      const active = (archive.peminjaman || []).find(p => !p.tanggalKembali);
-      if (active) returnPeminjaman(archive.id, active.id);
-    };
   });
 
   renderPaginationControls('arsip-pagination', filtered.length, state.pageArsip, state.perPageArsip,
@@ -561,6 +708,7 @@ function init() {
     state.loadingArsip = false;
     renderPerkaraSection();
     renderArsipSection();
+    renderPeminjamanSection();
     return;
   }
   fetchPerkara();
