@@ -100,7 +100,7 @@ function todayISO() {
 // ====== API LAYER ======
 async function apiGet(action) {
   const url = CONFIG.API_URL + '?action=' + encodeURIComponent(action) + '&token=' + encodeURIComponent(CONFIG.API_TOKEN || '');
-  const res = await fetch(url);
+  const res = await fetch(url, { cache: 'no-store' });
   const json = await res.json();
   if (!json.ok) throw new Error(json.error || 'Terjadi kesalahan pada server.');
   return json.data;
@@ -721,7 +721,11 @@ function closeModal() {
 }
 
 // ====== INIT ======
-function init() {
+// Apps Script Web Apps don't reliably handle two truly simultaneous
+// requests to the same deployment — occasionally one comes back with an
+// HTML page instead of running the script. Loading sequentially (await
+// each one before starting the next) avoids that race entirely.
+async function init() {
   if (!isConfigured()) {
     showGlobalError('Aplikasi belum terhubung ke Google Sheet. Tempel URL Web App Apps Script Anda ke dalam config.js (lihat README.md).');
     state.loadingPerkara = false;
@@ -731,8 +735,8 @@ function init() {
     renderPeminjamanSection();
     return;
   }
-  fetchPerkara();
-  fetchArsip();
+  await fetchPerkara();
+  await fetchArsip();
 }
 
 init();
