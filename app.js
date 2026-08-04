@@ -561,13 +561,31 @@ function openArsipFormModal(mode, record) {
     submitBtn.textContent = 'Menyimpan...';
     try {
       if (isEdit) {
-        await apiPost('updateArsip', Object.assign({ id: record.id }, payload));
+        const updated = await apiPost('updateArsip', Object.assign({ id: record.id }, payload));
+        if (updated !== true && typeof updated === 'object') {
+          const idx = state.arsip.findIndex(a => String(a.id) === String(updated.id));
+          if (idx !== -1) {
+            updated.peminjaman = state.arsip[idx].peminjaman; // preserve existing relations
+            state.arsip[idx] = updated;
+          }
+          renderArsipSection();
+        } else {
+          await fetchArsip();
+        }
       } else {
-        await apiPost('archive', Object.assign({ id: record.id }, payload));
+        const archived = await apiPost('archive', Object.assign({ id: record.id }, payload));
+        if (archived !== true && typeof archived === 'object') {
+          state.perkara = state.perkara.filter(p => String(p.id) !== String(record.id));
+          archived.peminjaman = [];
+          state.arsip.push(archived);
+          renderPerkaraSection();
+          renderArsipSection();
+        } else {
+          await Promise.all([fetchPerkara(), fetchArsip()]);
+        }
       }
       closeModal();
       clearGlobalError();
-      await Promise.all([fetchPerkara(), fetchArsip()]);
     } catch (err) {
       showGlobalError(err.message);
       submitBtn.disabled = false;
@@ -724,10 +742,20 @@ function openPinjamModal(archiveId) {
     submitBtn.disabled = true;
     submitBtn.textContent = 'Menyimpan...';
     try {
-      await apiPost('addPeminjaman', Object.assign({ arsipId: archiveId }, payload));
+      const entry = await apiPost('addPeminjaman', Object.assign({ arsipId: archiveId }, payload));
+      if (entry !== true && typeof entry === 'object') {
+        const arsipIdx = state.arsip.findIndex(a => String(a.id) === String(archiveId));
+        if (arsipIdx !== -1) {
+          state.arsip[arsipIdx].peminjaman.push(entry);
+          state.arsip[arsipIdx].status = 'Dipinjam';
+          renderArsipSection();
+          renderPeminjamanSection();
+        }
+      } else {
+        await fetchArsip();
+      }
       closeModal();
       clearGlobalError();
-      await fetchArsip();
     } catch (err) {
       showGlobalError(err.message);
       submitBtn.disabled = false;
@@ -738,9 +766,25 @@ function openPinjamModal(archiveId) {
 
 async function returnPeminjaman(archiveId, peminjamanId) {
   try {
-    await apiPost('returnPeminjaman', { arsipId: archiveId, peminjamanId: peminjamanId });
+    const res = await apiPost('returnPeminjaman', { arsipId: archiveId, peminjamanId: peminjamanId });
+    if (res !== true && typeof res === 'object') {
+      const arsipIdx = state.arsip.findIndex(a => String(a.id) === String(archiveId));
+      if (arsipIdx !== -1) {
+        const pjmIdx = state.arsip[arsipIdx].peminjaman.findIndex(p => String(p.id) === String(peminjamanId));
+        if (pjmIdx !== -1) {
+          state.arsip[arsipIdx].peminjaman[pjmIdx].tanggalKembali = res.tanggalKembali;
+        }
+        const stillOpen = state.arsip[arsipIdx].peminjaman.some(p => !p.tanggalKembali);
+        if (!stillOpen) {
+          state.arsip[arsipIdx].status = 'Terarsip';
+        }
+        renderArsipSection();
+        renderPeminjamanSection();
+      }
+    } else {
+      await fetchArsip();
+    }
     clearGlobalError();
-    await fetchArsip();
     closeModal();
   } catch (err) {
     showGlobalError(err.message);
