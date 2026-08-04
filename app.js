@@ -98,25 +98,55 @@ function todayISO() {
 }
 
 // ====== API LAYER ======
-async function apiGet(action) {
+async function apiGet(action, retries = 3) {
   const url = CONFIG.API_URL + '?action=' + encodeURIComponent(action) + '&token=' + encodeURIComponent(CONFIG.API_TOKEN || '');
-  const res = await fetch(url, { cache: 'no-store' });
-  const json = await res.json();
-  if (!json.ok) throw new Error(json.error || 'Terjadi kesalahan pada server.');
-  return json.data;
+  for (let i = 0; i < retries; i++) {
+    try {
+      const res = await fetch(url, { cache: 'no-store' });
+      const text = await res.text();
+      let json;
+      try {
+        json = JSON.parse(text);
+      } catch (err) {
+        if (i === retries - 1) throw new Error('Invalid JSON response from server. Make sure the Web App URL is correct and deployed as "Anyone".');
+        await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+        continue;
+      }
+      if (!json.ok) throw new Error(json.error || 'Terjadi kesalahan pada server.');
+      return json.data;
+    } catch (err) {
+      if (i === retries - 1 || err.message.includes('Terjadi kesalahan')) throw err;
+      await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+    }
+  }
 }
 
 // Note: no explicit Content-Type header is set on purpose. Sending the
 // body as plain text avoids a CORS preflight request, which Apps Script
 // Web Apps don't handle. Code.gs still parses it as JSON server-side.
-async function apiPost(action, payload) {
-  const res = await fetch(CONFIG.API_URL, {
-    method: 'POST',
-    body: JSON.stringify(Object.assign({ action: action, token: CONFIG.API_TOKEN || '' }, payload))
-  });
-  const json = await res.json();
-  if (!json.ok) throw new Error(json.error || 'Terjadi kesalahan pada server.');
-  return json.data;
+async function apiPost(action, payload, retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const res = await fetch(CONFIG.API_URL, {
+        method: 'POST',
+        body: JSON.stringify(Object.assign({ action: action, token: CONFIG.API_TOKEN || '' }, payload))
+      });
+      const text = await res.text();
+      let json;
+      try {
+        json = JSON.parse(text);
+      } catch (err) {
+        if (i === retries - 1) throw new Error('Invalid JSON response from server. Make sure the Web App URL is correct and deployed as "Anyone".');
+        await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+        continue;
+      }
+      if (!json.ok) throw new Error(json.error || 'Terjadi kesalahan pada server.');
+      return json.data;
+    } catch (err) {
+      if (i === retries - 1 || err.message.includes('Terjadi kesalahan')) throw err;
+      await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+    }
+  }
 }
 
 function showGlobalError(message) {
