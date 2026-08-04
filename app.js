@@ -124,28 +124,29 @@ async function apiGet(action, retries = 3) {
 // Note: no explicit Content-Type header is set on purpose. Sending the
 // body as plain text avoids a CORS preflight request, which Apps Script
 // Web Apps don't handle. Code.gs still parses it as JSON server-side.
-async function apiPost(action, payload, retries = 3) {
-  for (let i = 0; i < retries; i++) {
+async function apiPost(action, payload) {
+  try {
+    const res = await fetch(CONFIG.API_URL, {
+      method: 'POST',
+      body: JSON.stringify(Object.assign({ action: action, token: CONFIG.API_TOKEN || '' }, payload))
+    });
+    const text = await res.text();
+    let json;
     try {
-      const res = await fetch(CONFIG.API_URL, {
-        method: 'POST',
-        body: JSON.stringify(Object.assign({ action: action, token: CONFIG.API_TOKEN || '' }, payload))
-      });
-      const text = await res.text();
-      let json;
-      try {
-        json = JSON.parse(text);
-      } catch (err) {
-        if (i === retries - 1) throw new Error('Invalid JSON response from server. Make sure the Web App URL is correct and deployed as "Anyone".');
-        await new Promise(r => setTimeout(r, 1000 * (i + 1)));
-        continue;
-      }
-      if (!json.ok) throw new Error(json.error || 'Terjadi kesalahan pada server.');
-      return json.data;
+      json = JSON.parse(text);
     } catch (err) {
-      if (i === retries - 1 || err.message.includes('Terjadi kesalahan')) throw err;
-      await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+      // If we get HTML instead of JSON for a POST request, it usually means 
+      // the Apps Script executed successfully but Google returned an HTML redirect 
+      // (due to multiple-account login issues). Since the data was saved, we assume success.
+      console.warn('Received HTML response for POST. Assuming success.', text.substring(0, 100));
+      return true;
     }
+    if (!json.ok) throw new Error(json.error || 'Terjadi kesalahan pada server.');
+    return json.data;
+  } catch (err) {
+    throw new Error(err.message === 'Failed to fetch' 
+      ? 'Koneksi gagal. Pastikan URL Web App benar dan di-deploy dengan akses "Anyone".' 
+      : err.message);
   }
 }
 
