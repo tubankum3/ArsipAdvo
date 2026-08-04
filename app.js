@@ -160,6 +160,31 @@ function clearGlobalError() {
 }
 
 // ====== DATA LOADING ======
+async function fetchAllData() {
+  state.loadingPerkara = true;
+  state.loadingArsip = true;
+  state.errorPerkara = null;
+  state.errorArsip = null;
+  renderPerkaraSection();
+  renderArsipSection();
+  renderPeminjamanSection();
+  try {
+    const data = await apiGet('allData');
+    state.perkara = data.perkara;
+    state.arsip = data.arsip;
+  } catch (err) {
+    state.errorPerkara = err.message;
+    state.errorArsip = err.message;
+  } finally {
+    state.loadingPerkara = false;
+    state.loadingArsip = false;
+    renderPerkaraSection();
+    renderArsipSection();
+    renderPeminjamanSection();
+    renderStats();
+  }
+}
+
 async function fetchPerkara() {
   state.loadingPerkara = true;
   state.errorPerkara = null;
@@ -581,7 +606,7 @@ function openArsipFormModal(mode, record) {
           renderPerkaraSection();
           renderArsipSection();
         } else {
-          await Promise.all([fetchPerkara(), fetchArsip()]);
+          await fetchAllData();
         }
       }
       closeModal();
@@ -810,8 +835,7 @@ async function init() {
     renderPeminjamanSection();
     return;
   }
-  await fetchPerkara();
-  await fetchArsip();
+  await fetchAllData();
 }
 
 init();
