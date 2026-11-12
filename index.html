@@ -94,16 +94,15 @@
       <div class="border-b border-gray-200">
         <nav class="-mb-px flex space-x-8" aria-label="Tabs">
           <button id="tab-perkara" class="border-blue-600 text-blue-600 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
-            Daftar Perkara
+            Daftar Perkara Selesai
           </button>
           <button id="tab-arsip" class="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
-            Daftar Arsip
+            Daftar Arsip Perkara
           </button>
         </nav>
       </div>
 
       <div id="tab-content-perkara">
-        <!-- Table 1: Daftar Perkara -->
         <div class="bg-white rounded shadow-sm border border-gray-200 relative pt-2">
           <div class="absolute -top-4 left-6 bg-white px-3 py-1 text-gray-700 font-bold flex items-center text-sm border border-gray-200 rounded-t-md shadow-sm border-b-white">
             <span class="mr-2">📄</span><span>Daftar Perkara</span>
@@ -112,7 +111,7 @@
             <div class="relative mb-6">
               <input id="search-perkara" type="text"
                 class="w-full pl-5 pr-12 py-2.5 border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-inner text-sm"
-                placeholder="Search Perkara Selesai" />
+                placeholder="Cari Perkara Selesai..." />
             </div>
             <div id="perkara-table-wrap" class="overflow-x-auto border-x border-t border-gray-200 min-h-[80px]"></div>
             <div id="perkara-pagination" class="mt-4"></div>
@@ -121,29 +120,3 @@
       </div>
 
       <div id="tab-content-arsip" class="hidden">
-        <!-- Table 2: Daftar Arsip Perkara (Arsiparis only views/edits) -->
-        <div class="bg-white rounded shadow-sm border border-gray-200 relative pt-2">
-          <div class="absolute -top-4 left-6 bg-white px-3 py-1 text-gray-700 font-bold flex items-center text-sm border border-gray-200 rounded-t-md shadow-sm border-b-white">
-            <span class="mr-2">🗂️</span><span>Daftar Arsip Perkara</span>
-          </div>
-          <div class="p-6">
-            <div class="relative mb-6 mt-2">
-              <input id="search-arsip" type="text"
-                class="w-full pl-5 pr-12 py-2.5 border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-inner text-sm"
-                placeholder="Search Daftar Arsip Perkara Selesai" />
-            </div>
-            <div id="arsip-table-wrap" class="overflow-x-auto border-x border-t border-gray-200 mt-2 min-h-[80px]"></div>
-            <div id="arsip-pagination" class="mt-4"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modals are injected here -->
-  <div id="modal-root"></div>
-
-  <script src="config.js"></script>
-  <script src="app.js"></script>
-</body>
-</html>
