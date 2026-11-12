@@ -1,3 +1,8 @@
+"homepage": "https://tubankum3.github.io/ArsipAdvo",
+"scripts": {
+  "predeploy": "npm run build",
+  "deploy": "gh-pages -d dist"
+}
 {
   "name": "arsip-advokasi",
   "private": true,
