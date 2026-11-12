@@ -106,7 +106,7 @@ function todayISO() {
   return new Date().toISOString().split('T')[0];
 }
 
-// ====== API LAYER ======
+// ====== API LAYER (Disinkronkan) ======
 async function apiGet(action) {
   const url = CONFIG.API_URL + '?action=' + encodeURIComponent(action);
   const res = await fetch(url, { cache: 'no-store' });
@@ -115,7 +115,7 @@ async function apiGet(action) {
   try {
     json = JSON.parse(text);
   } catch (err) {
-    throw new Error('Invalid JSON response from server.');
+    throw new Error('Format respons server tidak valid.');
   }
   if (json.status !== 'success') throw new Error(json.message || 'Terjadi kesalahan pada server.');
   return json;
@@ -132,7 +132,7 @@ async function apiPost(action, payload) {
     try {
       json = JSON.parse(text);
     } catch (err) {
-      console.warn('Received HTML response for POST. Assuming success.', text.substring(0, 100));
+      // Fallback jika Google mengembalikan HTML redirect
       return true;
     }
     if (json.status !== 'success') throw new Error(json.message || 'Terjadi kesalahan pada server.');
