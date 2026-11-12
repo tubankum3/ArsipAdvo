@@ -1,3 +1,4 @@
+// ====== STATE ======
 const state = {
   activeView: 'peminjaman',
   perkara: [],
@@ -11,12 +12,13 @@ const state = {
   perPagePerkara: 10,
   perPageArsip: 10,
   perPagePeminjaman: 10,
-  loadingPerkara: false,
-  loadingArsip: false,
+  loadingPerkara: true,
+  loadingArsip: true,
   errorPerkara: null,
   errorArsip: null
 };
 
+// ====== NAVIGATION & DASHBOARD ======
 function switchView(viewName) {
   state.activeView = viewName;
   document.getElementById('view-peminjaman').classList.toggle('hidden', viewName !== 'peminjaman');
@@ -44,17 +46,25 @@ function renderStats() {
   const dipinjam = state.arsip.filter(a => a.status === 'Dipinjam').length;
   const tersedia = totalArsip - dipinjam;
 
-  document.getElementById('stat-total-arsip').textContent = totalArsip;
-  document.getElementById('stat-dipinjam').textContent = dipinjam;
-  document.getElementById('stat-tersedia').textContent = tersedia;
+  const statTotal = document.getElementById('stat-total-arsip');
+  const statDipinjam = document.getElementById('stat-dipinjam');
+  const statTersedia = document.getElementById('stat-tersedia');
+
+  if (statTotal) statTotal.textContent = totalArsip;
+  if (statDipinjam) statDipinjam.textContent = dipinjam;
+  if (statTersedia) statTersedia.textContent = tersedia;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('nav-peminjaman').addEventListener('click', () => switchView('peminjaman'));
-  document.getElementById('nav-arsiparis').addEventListener('click', () => switchView('arsiparis'));
-  
-  document.getElementById('tab-perkara').addEventListener('click', () => switchArsiparisTab('perkara'));
-  document.getElementById('tab-arsip').addEventListener('click', () => switchArsiparisTab('arsip'));
+  const navPeminjaman = document.getElementById('nav-peminjaman');
+  const navArsiparis = document.getElementById('nav-arsiparis');
+  const tabPerkara = document.getElementById('tab-perkara');
+  const tabArsip = document.getElementById('tab-arsip');
+
+  if (navPeminjaman) navPeminjaman.addEventListener('click', () => switchView('peminjaman'));
+  if (navArsiparis) navArsiparis.addEventListener('click', () => switchView('arsiparis'));
+  if (tabPerkara) tabPerkara.addEventListener('click', () => switchArsiparisTab('perkara'));
+  if (tabArsip) tabArsip.addEventListener('click', () => switchArsiparisTab('arsip'));
 });
 
 function switchArsiparisTab(tabName) {
@@ -62,6 +72,8 @@ function switchArsiparisTab(tabName) {
   const tabArsip = document.getElementById('tab-arsip');
   const contentPerkara = document.getElementById('tab-content-perkara');
   const contentArsip = document.getElementById('tab-content-arsip');
+
+  if (!tabPerkara || !tabArsip || !contentPerkara || !contentArsip) return;
 
   if (tabName === 'perkara') {
     tabPerkara.className = "border-blue-600 text-blue-600 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors";
@@ -76,35 +88,75 @@ function switchArsiparisTab(tabName) {
   }
 }
 
+// ====== SMALL HELPERS ======
 function escapeHtml(str) {
   if (str === null || str === undefined) return '';
-  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 function isConfigured() {
   return CONFIG.API_URL && CONFIG.API_URL.indexOf('PASTE_YOUR') === -1;
 }
 
+function todayISO() {
+  return new Date().toISOString().split('T')[0];
+}
+
+// ====== API LAYER ======
 async function apiGet(action) {
   const url = CONFIG.API_URL + '?action=' + encodeURIComponent(action);
-  const res = await fetch(url);
-  const json = await res.json();
+  const res = await fetch(url, { cache: 'no-store' });
+  const text = await res.text();
+  let json;
+  try {
+    json = JSON.parse(text);
+  } catch (err) {
+    throw new Error('Invalid JSON response from server.');
+  }
   if (json.status !== 'success') throw new Error(json.message || 'Terjadi kesalahan pada server.');
   return json;
 }
 
+async function apiPost(action, payload) {
+  try {
+    const res = await fetch(CONFIG.API_URL, {
+      method: 'POST',
+      body: JSON.stringify(Object.assign({ action: action }, payload))
+    });
+    const text = await res.text();
+    let json;
+    try {
+      json = JSON.parse(text);
+    } catch (err) {
+      console.warn('Received HTML response for POST. Assuming success.', text.substring(0, 100));
+      return true;
+    }
+    if (json.status !== 'success') throw new Error(json.message || 'Terjadi kesalahan pada server.');
+    return json.data || true;
+  } catch (err) {
+    throw new Error(err.message);
+  }
+}
+
 function showGlobalError(message) {
   const el = document.getElementById('global-error');
-  el.textContent = message;
-  el.classList.remove('hidden');
+  if (el) {
+    el.textContent = message;
+    el.classList.remove('hidden');
+  }
 }
 
 function clearGlobalError() {
-  document.getElementById('global-error').classList.add('hidden');
+  const el = document.getElementById('global-error');
+  if (el) el.classList.add('hidden');
 }
 
+// ====== DATA LOADING (DENGAN LOCALSTORAGE CACHE) ======
 async function fetchAllData() {
-  // Cek cache lokal terlebih dahulu agar aplikasi langsung tampil instan
   const cachedData = localStorage.getItem('arsip_cache_data');
   if (cachedData) {
     try {
@@ -130,7 +182,6 @@ async function fetchAllData() {
     state.perkara = data.perkara || [];
     state.arsip = data.arsip || [];
     
-    // Simpan ke localStorage untuk akses cepat berikutnya
     localStorage.setItem('arsip_cache_data', JSON.stringify({
       perkara: state.perkara,
       arsip: state.arsip
@@ -151,6 +202,7 @@ async function fetchAllData() {
   }
 }
 
+// ====== PAGINATION HELPER ======
 function paginate(items, page, perPage) {
   const start = (page - 1) * perPage;
   return items.slice(start, start + perPage);
@@ -180,98 +232,80 @@ function renderPaginationControls(containerId, totalItems, page, perPage, onPage
   container.querySelector('[data-perpage]').onchange = (e) => onPerPageChange(Number(e.target.value));
 }
 
+// ====== TABLE 1: DAFTAR PERKARA SELESAI ======
 function renderPerkaraSection() {
   const wrap = document.getElementById('perkara-table-wrap');
   if (!wrap) return;
+
   if (state.loadingPerkara && state.perkara.length === 0) {
-    wrap.innerHTML = `<div class="flex items-center justify-center py-10 gap-2 text-gray-500 text-sm"><div class="spinner"></div>Memuat data perkara...</div>`;
+    wrap.innerHTML = `<div class="flex items-center justify-center py-10 gap-2 text-gray-500 text-sm"><div class="spinner"></div>Memuat data...</div>`;
     return;
   }
-  const filtered = state.perkara.filter(p => (p.nomorPerkara || '').toLowerCase().includes(state.searchPerkara.toLowerCase()));
+  if (state.errorPerkara) {
+    wrap.innerHTML = `<div class="p-6 text-sm text-red-600">Gagal memuat data: ${escapeHtml(state.errorPerkara)}</div>`;
+    return;
+  }
+
+  const filtered = state.perkara.filter(p => (p.nomorPerkara || '').toLowerCase().includes(state.searchPerkara.toLowerCase()) || (p.jenisPerkara || '').toLowerCase().includes(state.searchPerkara.toLowerCase()));
   const rows = paginate(filtered, state.pagePerkara, state.perPagePerkara);
 
   wrap.innerHTML = `
     <table class="min-w-full">
-      <thead class="bg-gray-50 border-b border-gray-200">
+      <thead class="bg-[#fcfcfc] border-b border-gray-200">
         <tr>
-          <th class="px-5 py-3 text-left text-xs font-bold text-gray-700 uppercase">No</th>
-          <th class="px-5 py-3 text-left text-xs font-bold text-gray-700 uppercase">Nomor Perkara</th>
-          <th class="px-5 py-3 text-left text-xs font-bold text-gray-700 uppercase">Jenis Perkara</th>
-          <th class="px-5 py-3 text-left text-xs font-bold text-gray-700 uppercase">Tahun Masuk</th>
+          <th class="px-5 py-4 text-left text-xs font-bold text-gray-700 uppercase w-20 border-r border-gray-200">No</th>
+          <th class="px-5 py-4 text-left text-xs font-bold text-gray-700 uppercase border-r border-gray-200">Nomor Perkara</th>
+          <th class="px-5 py-4 text-left text-xs font-bold text-gray-700 uppercase border-r border-gray-200">Jenis Perkara</th>
+          <th class="px-5 py-4 text-left text-xs font-bold text-gray-700 uppercase border-r border-gray-200">Masuk</th>
+          <th class="px-5 py-4 text-center text-xs font-bold text-gray-700 uppercase">Aksi</th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-gray-100">
-        ${rows.length === 0 ? `<tr><td colspan="4" class="px-5 py-8 text-center text-gray-500 italic">Tidak ada data.</td></tr>` : 
-          rows.map((p, i) => `
-            <tr class="hover:bg-gray-50">
-              <td class="px-5 py-3 text-sm">${(state.pagePerkara - 1) * state.perPagePerkara + i + 1}</td>
-              <td class="px-5 py-3 text-sm font-medium">${escapeHtml(p.nomorPerkara)}</td>
-              <td class="px-5 py-3 text-sm">${escapeHtml(p.jenisPerkara)}</td>
-              <td class="px-5 py-3 text-sm">${escapeHtml(p.tahunMasuk)}</td>
-            </tr>
-          `).join('')}
+      <tbody class="bg-white divide-y divide-gray-100">
+        ${rows.length === 0 ? `
+          <tr><td colspan="5" class="px-5 py-10 text-center text-gray-500 italic">Tidak ada perkara selesai yang ditemukan.</td></tr>
+        ` : rows.map((p, i) => `
+          <tr class="hover:bg-gray-50 transition-colors">
+            <td class="px-5 py-4 text-sm text-gray-800 border-r border-gray-200">${(state.pagePerkara - 1) * state.perPagePerkara + i + 1}</td>
+            <td class="px-5 py-4 text-sm text-gray-800 border-r border-gray-200 font-medium">${escapeHtml(p.nomorPerkara)}</td>
+            <td class="px-5 py-4 text-sm text-gray-800 border-r border-gray-200">${escapeHtml(p.jenisPerkara)}</td>
+            <td class="px-5 py-4 text-sm text-gray-800 border-r border-gray-200">${escapeHtml(p.tahunMasuk)}</td>
+            <td class="px-5 py-4 text-center text-sm">
+              <button class="px-3 py-1.5 bg-cyan-500 text-white rounded hover:bg-cyan-600 transition-colors shadow-sm text-xs font-bold" data-archive-id="${escapeHtml(p.id)}">
+                Arsipkan
+              </button>
+            </td>
+          </tr>
+        `).join('')}
       </tbody>
     </table>
   `;
+
+  wrap.querySelectorAll('[data-archive-id]').forEach(btn => {
+    btn.onclick = () => {
+      const record = state.perkara.find(p => String(p.id) === btn.dataset.archiveId);
+      openArsipFormModal('create', record);
+    };
+  });
+
   renderPaginationControls('perkara-pagination', filtered.length, state.pagePerkara, state.perPagePerkara,
-    (p) => { state.pagePerkara = p; renderPerkaraSection(); },
-    (pp) => { state.perPagePerkara = pp; state.pagePerkara = 1; renderPerkaraSection(); }
+    (page) => { state.pagePerkara = page; renderPerkaraSection(); },
+    (perPage) => { state.perPagePerkara = perPage; state.pagePerkara = 1; renderPerkaraSection(); }
   );
 }
 
-function renderArsipSection() {
-  const wrap = document.getElementById('arsip-table-wrap');
-  if (!wrap) return;
-  if (state.loadingArsip && state.arsip.length === 0) {
-    wrap.innerHTML = `<div class="flex items-center justify-center py-10 gap-2 text-gray-500 text-sm"><div class="spinner"></div>Memuat data arsip...</div>`;
-    return;
-  }
-  const filtered = state.arsip.filter(a => (a.nomorPerkara || '').toLowerCase().includes(state.searchArsip.toLowerCase()));
-  const rows = paginate(filtered, state.pageArsip, state.perPageArsip);
-
-  wrap.innerHTML = `
-    <table class="min-w-full">
-      <thead class="bg-gray-50 border-b border-gray-200">
-        <tr>
-          <th class="px-5 py-3 text-left text-xs font-bold text-gray-700 uppercase">No</th>
-          <th class="px-5 py-3 text-left text-xs font-bold text-gray-700 uppercase">Nomor Perkara</th>
-          <th class="px-5 py-3 text-left text-xs font-bold text-gray-700 uppercase">Klasifikasi</th>
-          <th class="px-5 py-3 text-left text-xs font-bold text-gray-700 uppercase">Lokasi</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-100">
-        ${rows.length === 0 ? `<tr><td colspan="4" class="px-5 py-8 text-center text-gray-500 italic">Tidak ada data arsip.</td></tr>` : 
-          rows.map((a, i) => `
-            <tr class="hover:bg-gray-50">
-              <td class="px-5 py-3 text-sm">${(state.pageArsip - 1) * state.perPageArsip + i + 1}</td>
-              <td class="px-5 py-3 text-sm font-medium">${escapeHtml(a.nomorPerkara)}</td>
-              <td class="px-5 py-3 text-sm">${escapeHtml(a.kodeKlasifikasi)}</td>
-              <td class="px-5 py-3 text-sm">${escapeHtml(a.lokasiSimpan)}</td>
-            </tr>
-          `).join('')}
-      </tbody>
-    </table>
-  `;
-  renderPaginationControls('arsip-pagination', filtered.length, state.pageArsip, state.perPageArsip,
-    (p) => { state.pageArsip = p; renderArsipSection(); },
-    (pp) => { state.perPageArsip = pp; state.pageArsip = 1; renderArsipSection(); }
-  );
-}
-
-function renderPeminjamanSection() {
-  const wrap = document.getElementById('peminjaman-table-wrap');
-  if (!wrap) return;
-  wrap.innerHTML = `<div class="p-6 text-sm text-gray-600">Modul peminjaman siap digunakan dengan sinkronisasi data lokal.</div>`;
-}
-
+// ====== INPUT SEARCH & FILTER LISTENERS ======
 document.addEventListener('input', (e) => {
-  if (e.target.id === 'search-perkara') { state.searchPerkara = e.target.value; renderPerkaraSection(); }
-  if (e.target.id === 'search-arsip') { state.searchArsip = e.target.value; renderArsipSection(); }
-});
-
-// Inisialisasi awal
-if (!isConfigured()) {
-  showGlobalError('Silakan masukkan URL Web App Apps Script Anda ke dalam file config.js');
-} else {
-  fetchAllData();
-}
+  if (e.target.id === 'search-perkara') {
+    state.searchPerkara = e.target.value;
+    state.pagePerkara = 1;
+    renderPerkaraSection();
+  }
+  if (e.target.id === 'search-arsip') {
+    state.searchArsip = e.target.value;
+    state.pageArsip = 1;
+    renderArsipSection();
+  }
+  if (e.target.id === 'search-peminjaman') {
+    state.searchPeminjaman = e.target.value;
+    state.pagePeminjaman = 1;
+    renderPeminjamanSection();
