@@ -873,8 +873,8 @@ export default function App() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {paginatedRows.map((row) => (
-                      <tr key={row.abstraksiID} className="transition-colors hover:bg-slate-50/80">
+                    {paginatedRows.map((row, idx) => (
+                      <tr key={`perkara-${row.abstraksiID || 'row'}-${(page - 1) * ITEMS_PER_PAGE + idx}`} className="transition-colors hover:bg-slate-50/80">
                         <td className="px-5 py-3.5 align-top">
                           <div className="font-semibold text-slate-900 tabular-nums">{row.nomorPerkara}</div>
                           <div className="mt-0.5 font-mono text-xs text-slate-500 tabular-nums">{row.abstraksiID}</div>
@@ -925,8 +925,8 @@ export default function App() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {paginatedRows.map((row) => (
-                      <tr key={row.arsipID} className="transition-colors hover:bg-slate-50/80">
+                    {paginatedRows.map((row, idx) => (
+                      <tr key={`arsip-${row.arsipID || 'row'}-${(page - 1) * ITEMS_PER_PAGE + idx}`} className="transition-colors hover:bg-slate-50/80">
                         <td className="px-5 py-3.5 align-top">
                           <div className="font-semibold text-slate-900 tabular-nums">{row.nomorPerkara}</div>
                           <div className="mt-0.5 font-mono text-xs text-slate-500 tabular-nums">{row.arsipID}</div>
@@ -982,11 +982,11 @@ export default function App() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {paginatedRows.map((row) => {
+                    {paginatedRows.map((row, idx) => {
                       const arsip = arsipMap[String(row.arsipID)];
                       const returned = Boolean(row.tanggalKembali);
                       return (
-                        <tr key={row.peminjamanID} className="transition-colors hover:bg-slate-50/80">
+                        <tr key={`pjm-${row.peminjamanID || 'row'}-${(page - 1) * ITEMS_PER_PAGE + idx}`} className="transition-colors hover:bg-slate-50/80">
                           <td className="px-5 py-3.5 align-top font-mono text-xs font-medium text-slate-900 tabular-nums">
                             {row.peminjamanID}
                           </td>
@@ -1030,11 +1030,11 @@ export default function App() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {paginatedRows.map((row) => {
+                    {paginatedRows.map((row, idx) => {
                       const activeBorrow = activeBorrowByArsipId[String(row.arsipID)];
                       const isDipinjam = row.status === 'Dipinjam';
                       return (
-                        <tr key={row.arsipID} className="transition-colors hover:bg-slate-50/80">
+                        <tr key={`catalog-${row.arsipID || 'row'}-${(page - 1) * ITEMS_PER_PAGE + idx}`} className="transition-colors hover:bg-slate-50/80">
                           <td className="px-5 py-3.5 align-top">
                             <div className="font-semibold text-slate-900 tabular-nums">{row.nomorPerkara}</div>
                             <div className="mt-0.5 font-mono text-xs text-slate-500 tabular-nums">{row.arsipID}</div>

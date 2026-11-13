@@ -154,8 +154,8 @@ function doPost(e) {
         return jsonResponse_({ status: 'error', message: 'abstraksiID wajib disertakan untuk proses pengarsipan.' });
       }
 
-      var deleted = deleteRowById_(sheetPerkara, 'abstraksiID', d.abstraksiID);
-      if (!deleted) {
+      var perkaraRowInfo = findRowByColumnValue_(sheetPerkara, 'abstraksiID', d.abstraksiID);
+      if (!perkaraRowInfo) {
         return jsonResponse_({ status: 'error', message: 'Data perkara dengan ID ' + d.abstraksiID + ' tidak ditemukan atau sudah diarsipkan.' });
       }
 
@@ -178,6 +178,8 @@ function doPost(e) {
         d.boksFolder || '',
         'Terarsip'
       ]);
+      SpreadsheetApp.flush();
+      sheetPerkara.deleteRow(perkaraRowInfo.rowNumber);
 
       return jsonResponse_({
         status: 'success',
@@ -345,23 +347,6 @@ function findRowByColumnValue_(sheet, columnName, targetValue) {
     }
   }
   return null;
-}
-
-function deleteRowById_(sheet, columnName, idValue) {
-  var rows = sheet.getDataRange().getValues();
-  if (rows.length <= 1) return false;
-
-  var headers = rows[0];
-  var colIdx = headers.indexOf(columnName);
-  if (colIdx === -1) return false;
-
-  for (var i = rows.length - 1; i >= 1; i--) {
-    if (String(rows[i][colIdx]) === String(idValue)) {
-      sheet.deleteRow(i + 1);
-      return true;
-    }
-  }
-  return false;
 }
 
 function jsonResponse_(obj) {
