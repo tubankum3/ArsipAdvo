@@ -1,122 +1,27 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="id">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Manajemen Arsip Advokasi</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<style>
-  @media print {
-    body * { visibility: hidden; }
-    #print-area, #print-area * { visibility: visible; }
-    #print-area { position: absolute; top: 0; left: 0; width: 100%; }
-  }
-  .spinner {
-    border: 3px solid #e5e7eb;
-    border-top-color: #2563eb;
-    border-radius: 9999px;
-    width: 1.5rem;
-    height: 1.5rem;
-    animation: spin 0.7s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-</style>
-</head>
-<body class="bg-gray-50 min-h-screen">
-
-  <!-- Navigation Menu -->
-  <nav class="bg-blue-700 shadow-md">
-    <div class="max-w-6xl mx-auto px-6 md:px-10">
-      <div class="flex items-center justify-between h-16">
-        <div class="flex items-center">
-          <a href="#" class="text-white text-xl font-bold">Arsip Advokasi</a>
-          <div class="ml-10 flex items-baseline space-x-4">
-            <button id="nav-peminjaman" class="nav-btn bg-blue-800 text-white px-3 py-2 rounded-md text-sm font-medium transition-colors">Peminjaman</button>
-            <button id="nav-arsiparis" class="nav-btn text-blue-100 hover:bg-blue-600 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors">Arsiparis</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </nav>
-
-  <div class="max-w-6xl mx-auto p-6 md:p-10 space-y-8">
-    <div id="global-error" class="hidden bg-red-50 border border-red-200 text-red-700 text-sm rounded p-4 mb-4"></div>
-
-    <!-- VIEW: PEMINJAMAN -->
-    <div id="view-peminjaman" class="space-y-8">
-      <div>
-        <h1 class="text-3xl font-bold text-gray-800">Peminjaman Arsip</h1>
-        <p class="text-gray-600 mt-1">Pengelolaan dan pemantauan status peminjaman arsip perkara.</p>
-        <div class="border-b-4 border-blue-600 w-16 mt-4"></div>
-      </div>
-
-      <!-- Dashboard Stats -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div class="bg-white rounded shadow-sm border border-gray-200 p-6 flex flex-col items-center justify-center">
-          <div class="text-gray-500 text-sm font-bold uppercase tracking-wider mb-2">Total Arsip</div>
-          <div id="stat-total-arsip" class="text-4xl font-black text-blue-600">0</div>
-        </div>
-        <div class="bg-white rounded shadow-sm border border-gray-200 p-6 flex flex-col items-center justify-center">
-          <div class="text-gray-500 text-sm font-bold uppercase tracking-wider mb-2">Sedang Dipinjam</div>
-          <div id="stat-dipinjam" class="text-4xl font-black text-amber-500">0</div>
-        </div>
-        <div class="bg-white rounded shadow-sm border border-gray-200 p-6 flex flex-col items-center justify-center">
-          <div class="text-gray-500 text-sm font-bold uppercase tracking-wider mb-2">Tersedia</div>
-          <div id="stat-tersedia" class="text-4xl font-black text-green-500">0</div>
-        </div>
-      </div>
-
-      <!-- Table: Daftar Peminjaman Arsip -->
-      <div class="bg-white rounded shadow-sm border border-gray-200 relative pt-2">
-        <div class="absolute -top-4 left-6 bg-white px-3 py-1 text-gray-700 font-bold flex items-center text-sm border border-gray-200 rounded-t-md shadow-sm border-b-white">
-          <span class="mr-2">📗</span><span>Peminjaman Arsip</span>
-        </div>
-        <div class="p-6">
-          <div class="relative mb-6 mt-2">
-            <input id="search-peminjaman" type="text"
-              class="w-full pl-5 pr-12 py-2.5 border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-inner text-sm"
-              placeholder="Cari berdasarkan Nomor Perkara atau Jenis..." />
-          </div>
-          <div id="peminjaman-table-wrap" class="overflow-x-auto border-x border-t border-gray-200 mt-2 min-h-[80px]"></div>
-          <div id="peminjaman-pagination" class="mt-4"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- VIEW: ARSIPARIS -->
-    <div id="view-arsiparis" class="space-y-8 hidden">
-      <div>
-        <h1 class="text-3xl font-bold text-gray-800">Manajemen Arsip</h1>
-        <p class="text-gray-600 mt-1">Perekaman dan pengelolaan data arsip perkara.</p>
-        <div class="border-b-4 border-blue-600 w-16 mt-4"></div>
-      </div>
-
-      <div class="border-b border-gray-200">
-        <nav class="-mb-px flex space-x-8" aria-label="Tabs">
-          <button id="tab-perkara" class="border-blue-600 text-blue-600 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
-            Daftar Perkara Selesai
-          </button>
-          <button id="tab-arsip" class="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
-            Daftar Arsip Perkara
-          </button>
-        </nav>
-      </div>
-
-      <div id="tab-content-perkara">
-        <div class="bg-white rounded shadow-sm border border-gray-200 relative pt-2">
-          <div class="absolute -top-4 left-6 bg-white px-3 py-1 text-gray-700 font-bold flex items-center text-sm border border-gray-200 rounded-t-md shadow-sm border-b-white">
-            <span class="mr-2">📄</span><span>Daftar Perkara</span>
-          </div>
-          <div class="p-6">
-            <div class="relative mb-6">
-              <input id="search-perkara" type="text"
-                class="w-full pl-5 pr-12 py-2.5 border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-inner text-sm"
-                placeholder="Cari Perkara Selesai..." />
-            </div>
-            <div id="perkara-table-wrap" class="overflow-x-auto border-x border-t border-gray-200 min-h-[80px]"></div>
-            <div id="perkara-pagination" class="mt-4"></div>
-          </div>
-        </div>
-      </div>
-
-      <div id="tab-content-arsip" class="hidden">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sistem Manajemen Arsip & Peminjaman Perkara Pengadilan</title>
+    <meta
+      name="description"
+      content="Aplikasi manajemen arsip dan sirkulasi peminjaman berkas perkara pengadilan berbasis React, Tailwind CSS, dan Google Apps Script."
+    />
+    <meta property="og:title" content="Sistem Manajemen Arsip & Peminjaman Perkara Pengadilan" />
+    <meta
+      property="og:description"
+      content="Aplikasi manajemen arsip dan sirkulasi peminjaman berkas perkara pengadilan berbasis React, Tailwind CSS, dan Google Apps Script."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400..700&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="bg-slate-50 text-slate-900 antialiased selection:bg-slate-900 selection:text-white">
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
