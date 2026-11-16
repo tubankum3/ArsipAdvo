@@ -35,7 +35,7 @@ const STORAGE_KEY_URL = 'arsip_perkara_gas_url';
 const STORAGE_KEY_WA = 'arsip_perkara_wa_number';
 const STORAGE_KEY_ARSIPARIS_PASS = 'arsip_perkara_arsiparis_pass';
 const ITEMS_PER_PAGE = 10;
-const DEFAULT_WA_NUMBER = '6285737441360';
+const DEFAULT_WA_NUMBER = '6285842234615';
 const DEFAULT_ARSIPARIS_PASS = 'arsip123';
 
 function normalizeWaNumber(raw) {
