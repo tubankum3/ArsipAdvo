@@ -35,7 +35,8 @@ var SHEETS_CONFIG = {
     'jumlahBerkas',
     'lokasiSimpan',
     'boksFolder',
-    'status'
+    'status',
+    'keterangan'
   ],
   Peminjaman: [
     'peminjamanID',
@@ -49,7 +50,7 @@ var SHEETS_CONFIG = {
 
 /**
  * Jalankan fungsi ini satu kali di Apps Script Editor untuk membuat
- * ke-3 sheet beserta header kolom yang sesuai.
+ * ke-3 sheet beserta header kolom yang sesuai (atau menambah kolom baru yang belum ada).
  */
 function setupSheets() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -60,11 +61,7 @@ function setupSheets() {
     if (!sheet) {
       sheet = ss.insertSheet(sheetName);
     }
-    if (sheet.getLastRow() === 0) {
-      sheet.appendRow(headers);
-      sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
-      sheet.setFrozenRows(1);
-    }
+    ensureSheetHeaders_(sheet, headers);
   }
 }
 
@@ -159,25 +156,32 @@ function doPost(e) {
         return jsonResponse_({ status: 'error', message: 'Data perkara dengan ID ' + d.abstraksiID + ' tidak ditemukan atau sudah diarsipkan.' });
       }
 
+      var arsipHeaders = ensureSheetHeaders_(sheetArsip, SHEETS_CONFIG.ArsipPerkara);
       var arsipID = d.abstraksiID;
-      sheetArsip.appendRow([
-        arsipID,
-        d.nomorPerkara || '',
-        d.jenisPerkara || '',
-        d.tahunMasuk || '',
-        d.pengadilan || '',
-        d.wilayah || '',
-        d.pihakP || '',
-        d.pihakT || '',
-        d.kodeKlasifikasi || '',
-        d.tahunSelesai || '',
-        d.kurunWaktu || '',
-        d.uraianBerkas || '',
-        d.jumlahBerkas || '',
-        d.lokasiSimpan || '',
-        d.boksFolder || '',
-        'Terarsip'
-      ]);
+      var arsipRecord = {
+        arsipID: arsipID,
+        nomorPerkara: d.nomorPerkara || '',
+        jenisPerkara: d.jenisPerkara || '',
+        tahunMasuk: d.tahunMasuk || '',
+        pengadilan: d.pengadilan || '',
+        wilayah: d.wilayah || '',
+        pihakP: d.pihakP || '',
+        pihakT: d.pihakT || '',
+        kodeKlasifikasi: d.kodeKlasifikasi || '',
+        tahunSelesai: d.tahunSelesai || '',
+        kurunWaktu: d.kurunWaktu || '',
+        uraianBerkas: d.uraianBerkas || '',
+        jumlahBerkas: d.jumlahBerkas || '',
+        lokasiSimpan: d.lokasiSimpan || '',
+        boksFolder: d.boksFolder || '',
+        status: 'Terarsip',
+        keterangan: d.keterangan || ''
+      };
+      var newArsipRow = arsipHeaders.map(function (header) {
+        return Object.prototype.hasOwnProperty.call(arsipRecord, header) ? arsipRecord[header] : '';
+      });
+
+      sheetArsip.appendRow(newArsipRow);
       SpreadsheetApp.flush();
       sheetPerkara.deleteRow(perkaraRowInfo.rowNumber);
 
@@ -300,6 +304,27 @@ function doPost(e) {
 }
 
 // ====== HELPER FUNCTIONS ======
+
+function ensureSheetHeaders_(sheet, expectedHeaders) {
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(expectedHeaders);
+    sheet.getRange(1, 1, 1, expectedHeaders.length).setFontWeight('bold');
+    sheet.setFrozenRows(1);
+    return expectedHeaders.slice();
+  }
+
+  var lastCol = Math.max(1, sheet.getLastColumn());
+  var existingHeaders = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  for (var i = 0; i < expectedHeaders.length; i++) {
+    var colName = expectedHeaders[i];
+    if (existingHeaders.indexOf(colName) === -1) {
+      var nextCol = existingHeaders.length + 1;
+      sheet.getRange(1, nextCol).setValue(colName).setFontWeight('bold');
+      existingHeaders.push(colName);
+    }
+  }
+  return existingHeaders;
+}
 
 function getSheetData_(sheet, tz) {
   if (!sheet) return [];

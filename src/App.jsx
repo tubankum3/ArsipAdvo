@@ -21,6 +21,7 @@ import {
   FolderArchive,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Loader2,
   Phone
 } from 'lucide-react';
@@ -37,6 +38,20 @@ const STORAGE_KEY_ARSIPARIS_PASS = 'arsip_perkara_arsiparis_pass';
 const ITEMS_PER_PAGE = 10;
 const DEFAULT_WA_NUMBER = '6285842234615';
 const DEFAULT_ARSIPARIS_PASS = 'arsip123';
+const LOKASI_SIMPAN_OPTIONS = [
+  'Daftar Arsip I (Basement Dhanapala)',
+  'Daftar Arsip II (Basement Dhanapala)',
+  'Daftar Arsip III A dan B',
+  'Daftar Arsip IV (Ruang Arsip Ciledug)',
+  'Daftar Arsip V (Ruang Arsip Ciledug)',
+  'Daftar Arsip Konvensional (Djuanda I Lantai 15)'
+];
+const KODE_KLASIFIKASI_OPTIONS = [
+  'HK2.0 - Penanganan Perkara dan Pendampingan',
+  'HK2.1 - Penelitian dan Analisis',
+  'HK2.2 - Penyusunan Hukum',
+  'HK2.3 - Pengawasan dan Pengendalian'
+];
 
 function normalizeWaNumber(raw) {
   const digits = String(raw || '').replace(/\D/g, '');
@@ -237,13 +252,14 @@ export default function App() {
   });
 
   const [archiveForm, setArchiveForm] = useState({
-    kodeKlasifikasi: '',
+    kodeKlasifikasi: KODE_KLASIFIKASI_OPTIONS[0],
+    kurunAwal: String(new Date().getFullYear()),
     tahunSelesai: String(new Date().getFullYear()),
-    kurunWaktu: '',
     uraianBerkas: '',
     jumlahBerkas: '1 Berkas',
     lokasiSimpan: '',
-    boksFolder: ''
+    boksFolder: '',
+    keterangan: ''
   });
 
   const [borrowForm, setBorrowForm] = useState({
@@ -257,6 +273,19 @@ export default function App() {
   const urlReady = isConfiguredUrl(gasUrl);
 
   const waTriggerRef = useRef(null);
+  const kodeDropdownRef = useRef(null);
+  const [showKodeDropdown, setShowKodeDropdown] = useState(false);
+
+  useEffect(() => {
+    if (!showKodeDropdown) return undefined;
+    const handleOutsideClick = (event) => {
+      if (kodeDropdownRef.current && !kodeDropdownRef.current.contains(event.target)) {
+        setShowKodeDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [showKodeDropdown]);
 
   const showToast = useCallback((type, text, waUrl = '') => {
     setFeedback({ type, text, waUrl });
@@ -519,21 +548,30 @@ export default function App() {
   };
 
   const openArchiveModal = (perkara) => {
+    const startYear = String(perkara.tahunMasuk || new Date().getFullYear());
     setArchiveTarget(perkara);
+    setShowKodeDropdown(false);
     setArchiveForm({
-      kodeKlasifikasi: '',
+      kodeKlasifikasi: KODE_KLASIFIKASI_OPTIONS[0],
+      kurunAwal: startYear,
       tahunSelesai: String(new Date().getFullYear()),
-      kurunWaktu: `${perkara.tahunMasuk || new Date().getFullYear()} - ${new Date().getFullYear()}`,
       uraianBerkas: `${perkara.jenisPerkara || 'Perkara'} Nomor ${perkara.nomorPerkara || '-'}`,
       jumlahBerkas: '1 Berkas',
       lokasiSimpan: '',
-      boksFolder: ''
+      boksFolder: '',
+      keterangan: ''
     });
   };
 
   const handleArchiveSubmit = async (e) => {
     e.preventDefault();
     if (!archiveTarget) return;
+    const kurunAwalClean = String(archiveForm.kurunAwal || archiveTarget.tahunMasuk || '').trim();
+    const tahunSelesaiClean = String(archiveForm.tahunSelesai || '').trim();
+    const kurunWaktuValue =
+      kurunAwalClean && tahunSelesaiClean
+        ? `${kurunAwalClean} s.d. ${tahunSelesaiClean}`
+        : kurunAwalClean || tahunSelesaiClean;
     try {
       await postAction('arsipkanPerkara', {
         arsipID: archiveTarget.abstraksiID,
@@ -545,7 +583,14 @@ export default function App() {
         wilayah: archiveTarget.wilayah,
         pihakP: archiveTarget.pihakP,
         pihakT: archiveTarget.pihakT,
-        ...archiveForm
+        kodeKlasifikasi: archiveForm.kodeKlasifikasi,
+        tahunSelesai: tahunSelesaiClean,
+        kurunWaktu: kurunWaktuValue,
+        uraianBerkas: archiveForm.uraianBerkas,
+        jumlahBerkas: archiveForm.jumlahBerkas,
+        lokasiSimpan: archiveForm.lokasiSimpan,
+        boksFolder: archiveForm.boksFolder,
+        keterangan: archiveForm.keterangan
       });
       setArchiveTarget(null);
       showToast('success', `Perkara ${archiveTarget.nomorPerkara} berhasil dipindahkan ke ArsipPerkara.`);
@@ -1560,11 +1605,11 @@ export default function App() {
           subtitle="Data perkara akan dipindahkan dari sheet Perkara ke ArsipPerkara dengan status Terarsip."
           onClose={() => !submitting && setArchiveTarget(null)}
         >
-          <form onSubmit={handleArchiveSubmit} className="space-y-5">
+          <form onSubmit={handleArchiveSubmit} className="space-y-4">
             {/* Ringkasan data awal otomatis terisi */}
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-semibold text-slate-500 mb-2">Data Awal Perkara (Otomatis Terisi)</p>
-              <div className="grid grid-cols-1 gap-x-6 gap-y-2 text-xs sm:grid-cols-2">
+            <div className="rounded-lg border border-blue-200/80 bg-blue-50/50 p-4">
+              <p className="text-xs font-semibold text-slate-600 mb-2">Data Awal Perkara (Otomatis Terisi)</p>
+              <div className="grid grid-cols-1 gap-x-6 gap-y-1.5 text-xs sm:grid-cols-2">
                 <div>
                   <span className="text-slate-500">Nomor Perkara: </span>
                   <span className="font-semibold text-slate-900 tabular-nums">{archiveTarget.nomorPerkara}</span>
@@ -1590,119 +1635,225 @@ export default function App() {
               </div>
             </div>
 
-            {/* Field Kearsipan */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Kode Klasifikasi *
+            {/* Field Kearsipan (Layout Horizontal 2 Kolom) */}
+            <div className="space-y-3.5 pt-1">
+              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-[190px_1fr] sm:items-center sm:gap-4">
+                <label className="text-xs font-semibold text-slate-600 sm:text-right">
+                  Arsip ID
+                </label>
+                <input
+                  type="text"
+                  readOnly
+                  value={archiveTarget.abstraksiID || ''}
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-sm text-slate-600 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-[190px_1fr] sm:items-center sm:gap-4">
+                <label className="text-xs font-semibold text-slate-600 sm:text-right">
+                  Kode Klasifikasi Arsip <span className="text-red-500">*</span>
+                </label>
+                <div ref={kodeDropdownRef} className="relative">
+                  <input
+                    type="text"
+                    required
+                    value={archiveForm.kodeKlasifikasi}
+                    onFocus={() => setShowKodeDropdown(true)}
+                    onClick={() => setShowKodeDropdown(true)}
+                    onChange={(e) => setArchiveForm({ ...archiveForm, kodeKlasifikasi: e.target.value })}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape' && showKodeDropdown) {
+                        e.nativeEvent.stopPropagation();
+                        setShowKodeDropdown(false);
+                      }
+                    }}
+                    placeholder="Pilih atau ketik kode klasifikasi"
+                    className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-3 pr-9 text-sm text-slate-900 focus:border-slate-900 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      setShowKodeDropdown((prev) => !prev);
+                    }}
+                    aria-label="Tampilkan daftar kode klasifikasi"
+                    className="absolute inset-y-0 right-0 flex items-center px-2.5 text-slate-500 hover:text-slate-800"
+                  >
+                    <ChevronDown className={`h-4 w-4 transition-transform ${showKodeDropdown ? 'rotate-180' : ''}`} />
+                  </button>
+                  {showKodeDropdown && (
+                    <ul
+                      role="listbox"
+                      className="absolute left-0 right-0 z-20 mt-1 max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+                    >
+                      {KODE_KLASIFIKASI_OPTIONS.map((opt) => {
+                        const isSelected = archiveForm.kodeKlasifikasi === opt;
+                        return (
+                          <li key={opt} role="option" aria-selected={isSelected}>
+                            <button
+                              type="button"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                setArchiveForm((prev) => ({ ...prev, kodeKlasifikasi: opt }));
+                                setShowKodeDropdown(false);
+                              }}
+                              className={`w-full px-3 py-2 text-left text-sm transition-colors ${
+                                isSelected
+                                  ? 'bg-blue-600 font-medium text-white'
+                                  : 'text-slate-800 hover:bg-slate-100'
+                              }`}
+                            >
+                              {opt}
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-[190px_1fr] sm:items-center sm:gap-4">
+                <label className="text-xs font-semibold text-slate-600 sm:text-right">
+                  Nomor Perkara <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  readOnly
+                  value={archiveTarget.nomorPerkara || ''}
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 tabular-nums focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-[190px_1fr] sm:items-center sm:gap-4">
+                <label className="text-xs font-semibold text-slate-600 sm:text-right">
+                  Uraian Berkas / Informasi <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   required
-                  value={archiveForm.kodeKlasifikasi}
-                  onChange={(e) => setArchiveForm({ ...archiveForm, kodeKlasifikasi: e.target.value })}
-                  placeholder="Contoh: HK.02 / 01.03"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm focus:border-slate-900 focus:outline-none"
+                  value={archiveForm.uraianBerkas}
+                  onChange={(e) => setArchiveForm({ ...archiveForm, uraianBerkas: e.target.value })}
+                  placeholder="Contoh: Putusan, BAH, Bukti, Surat Kuasa"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:outline-none"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Tahun Selesai *
+
+              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-[190px_1fr] sm:items-center sm:gap-4">
+                <label className="text-xs font-semibold text-slate-600 sm:text-right">
+                  Kurun Waktu <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="number"
-                  required
-                  min="1950"
-                  max="2100"
-                  value={archiveForm.tahunSelesai}
-                  onChange={(e) => setArchiveForm({ ...archiveForm, tahunSelesai: e.target.value })}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm tabular-nums focus:border-slate-900 focus:outline-none"
-                />
+                <div className="flex items-center gap-2.5">
+                  <input
+                    type="number"
+                    required
+                    min="1950"
+                    max="2100"
+                    value={archiveForm.kurunAwal}
+                    onChange={(e) => setArchiveForm({ ...archiveForm, kurunAwal: e.target.value })}
+                    aria-label="Tahun Awal Kurun Waktu"
+                    className="w-28 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-center font-mono text-sm tabular-nums text-slate-700 focus:border-slate-900 focus:bg-white focus:outline-none"
+                  />
+                  <span className="text-xs font-medium text-slate-500">s.d.</span>
+                  <input
+                    type="number"
+                    required
+                    min="1950"
+                    max="2100"
+                    value={archiveForm.tahunSelesai}
+                    onChange={(e) => setArchiveForm({ ...archiveForm, tahunSelesai: e.target.value })}
+                    aria-label="Tahun Selesai"
+                    className="w-28 rounded-lg border border-slate-300 bg-white px-3 py-2 text-center font-mono text-sm tabular-nums text-slate-900 focus:border-slate-900 focus:outline-none"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Kurun Waktu *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={archiveForm.kurunWaktu}
-                  onChange={(e) => setArchiveForm({ ...archiveForm, kurunWaktu: e.target.value })}
-                  placeholder="Contoh: 2024 - 2025"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm tabular-nums focus:border-slate-900 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Jumlah Berkas *
+
+              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-[190px_1fr] sm:items-center sm:gap-4">
+                <label className="text-xs font-semibold text-slate-600 sm:text-right">
+                  Jumlah Berkas <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   required
                   value={archiveForm.jumlahBerkas}
                   onChange={(e) => setArchiveForm({ ...archiveForm, jumlahBerkas: e.target.value })}
-                  placeholder="Contoh: 2 Bundel / 1 Berkas"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-900 focus:outline-none"
+                  placeholder="Contoh: 1 Berkas"
+                  className="w-full sm:w-44 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-slate-900 focus:outline-none"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Lokasi Simpan *
+
+              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-[190px_1fr] sm:items-center sm:gap-4">
+                <label className="text-xs font-semibold text-slate-600 sm:text-right">
+                  Lokasi <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
-                  required
-                  value={archiveForm.lokasiSimpan}
-                  onChange={(e) => setArchiveForm({ ...archiveForm, lokasiSimpan: e.target.value })}
-                  placeholder="Contoh: Ruang Arsip Lt. 2 - Rak B3"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-900 focus:outline-none"
-                />
+                <div>
+                  <input
+                    type="text"
+                    list="lokasi-simpan-options"
+                    required
+                    value={archiveForm.lokasiSimpan}
+                    onChange={(e) => setArchiveForm({ ...archiveForm, lokasiSimpan: e.target.value })}
+                    placeholder="Pilih atau ketik lokasi simpan"
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:outline-none"
+                  />
+                  <datalist id="lokasi-simpan-options">
+                    {LOKASI_SIMPAN_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt} />
+                    ))}
+                  </datalist>
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Boks / Folder *
+
+              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-[190px_1fr] sm:items-center sm:gap-4">
+                <label className="text-xs font-semibold text-slate-600 sm:text-right">
+                  Boks dan Folder <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   required
                   value={archiveForm.boksFolder}
                   onChange={(e) => setArchiveForm({ ...archiveForm, boksFolder: e.target.value })}
-                  placeholder="Contoh: BOKS-12 / FOLDER-04"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm focus:border-slate-900 focus:outline-none"
+                  placeholder="Contoh: B03 - F12"
+                  className="w-full sm:w-64 rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:outline-none"
                 />
               </div>
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Uraian Berkas *
+
+              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-[190px_1fr] sm:items-start sm:gap-4">
+                <label className="text-xs font-semibold text-slate-600 sm:pt-2 sm:text-right">
+                  Keterangan / Catatan
                 </label>
                 <textarea
                   rows={3}
-                  required
-                  value={archiveForm.uraianBerkas}
-                  onChange={(e) => setArchiveForm({ ...archiveForm, uraianBerkas: e.target.value })}
-                  placeholder="Ringkasan isi berkas, putusan, dan lampiran arsip..."
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-900 focus:outline-none"
+                  value={archiveForm.keterangan}
+                  onChange={(e) => setArchiveForm({ ...archiveForm, keterangan: e.target.value })}
+                  placeholder="Catatan tambahan (opsional)"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:outline-none"
                 />
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={() => setArchiveTarget(null)}
-                className="h-9 rounded-lg border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                Batal
-              </button>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-slate-900 px-4 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
-              >
-                {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                <span>{submitting ? 'Memindahkan...' : 'Simpan & Arsipkan'}</span>
-              </button>
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200">
+              <p className="text-xs italic text-slate-500">
+                Field bertanda <span className="text-red-500">*</span> wajib diisi
+              </p>
+              <div className="flex items-center gap-2 ml-auto">
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => setArchiveTarget(null)}
+                  className="h-9 rounded-lg border border-slate-200 bg-slate-100 px-4 text-xs font-semibold text-slate-700 hover:bg-slate-200/80"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-blue-600 px-4 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  <span>{submitting ? 'Memindahkan...' : 'Arsipkan'}</span>
+                </button>
+              </div>
             </div>
           </form>
         </ModalShell>
