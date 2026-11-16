@@ -128,7 +128,7 @@ function doPost(e) {
         d.wilayah || '',
         d.pihakP || '',
         d.pihakT || '',
-        d.statusPerkara || 'Putus'
+        d.statusPerkara || 'Selesai'
       ];
 
       sheetPerkara.appendRow(newPerkara);

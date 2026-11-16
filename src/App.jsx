@@ -242,13 +242,13 @@ export default function App() {
   // ====== FORM STATES ======
   const [perkaraForm, setPerkaraForm] = useState({
     nomorPerkara: '',
-    jenisPerkara: 'Perdata Gugatan',
+    jenisPerkara: 'Mahkamah Konstitusi',
     tahunMasuk: String(new Date().getFullYear()),
     pengadilan: '',
     wilayah: '',
     pihakP: '',
     pihakT: '',
-    statusPerkara: 'Putus'
+    statusPerkara: 'Selesai'
   });
 
   const [archiveForm, setArchiveForm] = useState({
@@ -533,13 +533,13 @@ export default function App() {
       setShowAddPerkaraModal(false);
       setPerkaraForm({
         nomorPerkara: '',
-        jenisPerkara: 'Perdata Gugatan',
+        jenisPerkara: 'Mahkamah Konstitusi',
         tahunMasuk: String(new Date().getFullYear()),
         pengadilan: '',
         wilayah: '',
         pihakP: '',
         pihakT: '',
-        statusPerkara: 'Putus'
+        statusPerkara: 'Selesai'
       });
       showToast('success', 'Perkara baru berhasil ditambahkan ke daftar perkara.');
     } catch (err) {
@@ -1484,15 +1484,20 @@ export default function App() {
                 <select
                   value={perkaraForm.jenisPerkara}
                   onChange={(e) => setPerkaraForm({ ...perkaraForm, jenisPerkara: e.target.value })}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-900 focus:outline-none"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-slate-900 focus:outline-none"
                 >
-                  <option value="Perdata Gugatan">Perdata Gugatan</option>
-                  <option value="Perdata Permohonan">Perdata Permohonan</option>
-                  <option value="Pidana Biasa">Pidana Biasa</option>
-                  <option value="Pidana Singkat">Pidana Singkat</option>
-                  <option value="PHI / Niaga">PHI / Niaga</option>
-                  <option value="TUN">Tata Usaha Negara</option>
-                  <option value="Agama">Perkara Agama</option>
+                  <option value="Mahkamah Konstitusi">Mahkamah Konstitusi</option>
+                  <option value="Mahkamah Agung">Mahkamah Agung</option>
+                  <option value="Perdata">Perdata</option>
+                  <option value="Perdata Khusus">Perdata Khusus</option>
+                  <option value="Pidana">Pidana</option>
+                  <option value="Pidana Khusus">Pidana Khusus</option>
+                  <option value="Agama">Agama</option>
+                  <option value="Tata Usaha Negara (TUN)">Tata Usaha Negara (TUN)</option>
+                  <option value="Sengketa Pajak">Sengketa Pajak</option>
+                  <option value="Sengketa Informasi Publik">Sengketa Informasi Publik</option>
+                  <option value="Arbitrase">Arbitrase</option>
+                  <option value="Perkara Lain-lain">Perkara Lain-lain</option>
                 </select>
               </div>
               <div>
@@ -1513,14 +1518,14 @@ export default function App() {
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Status Perkara *
                 </label>
-                <input
-                  type="text"
-                  required
+                <select
                   value={perkaraForm.statusPerkara}
                   onChange={(e) => setPerkaraForm({ ...perkaraForm, statusPerkara: e.target.value })}
-                  placeholder="Putus / Minutasi / BHT"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-900 focus:outline-none"
-                />
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-slate-900 focus:outline-none"
+                >
+                  <option value="Selesai">Selesai</option>
+                  <option value="Aktif">Aktif</option>
+                </select>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
