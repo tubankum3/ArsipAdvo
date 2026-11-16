@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Scale,
   Archive,
@@ -21,7 +21,8 @@ import {
   FolderArchive,
   ChevronLeft,
   ChevronRight,
-  Loader2
+  Loader2,
+  Phone
 } from 'lucide-react';
 
 /**
@@ -31,11 +32,20 @@ import {
  */
 const DEFAULT_GAS_URL = 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL';
 const STORAGE_KEY_URL = 'arsip_perkara_gas_url';
+const STORAGE_KEY_WA = 'arsip_perkara_wa_number';
+const STORAGE_KEY_ARSIPARIS_PASS = 'arsip_perkara_arsiparis_pass';
 const ITEMS_PER_PAGE = 10;
-const WA_NUMBER = '6285737441360';
+const DEFAULT_WA_NUMBER = '6285737441360';
+const DEFAULT_ARSIPARIS_PASS = 'arsip123';
 
-function buildWaLink(message) {
-  return `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(message)}`;
+function normalizeWaNumber(raw) {
+  const digits = String(raw || '').replace(/\D/g, '');
+  if (digits.startsWith('0')) return '62' + digits.slice(1);
+  return digits;
+}
+
+function buildWaLink(message, waNumber = DEFAULT_WA_NUMBER) {
+  return `https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`;
 }
 
 function getTodayISO() {
@@ -176,13 +186,26 @@ export default function App() {
   });
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [configInput, setConfigInput] = useState(gasUrl === DEFAULT_GAS_URL ? '' : gasUrl);
+  const [waNumber, setWaNumber] = useState(() => localStorage.getItem(STORAGE_KEY_WA) || DEFAULT_WA_NUMBER);
+  const [showWaModal, setShowWaModal] = useState(false);
+  const [waInput, setWaInput] = useState('');
+  const [isArsiparisAuthed, setIsArsiparisAuthed] = useState(
+    () => localStorage.getItem(STORAGE_KEY_ARSIPARIS_PASS) === DEFAULT_ARSIPARIS_PASS
+  );
+  const [showArsiparisAuthModal, setShowArsiparisAuthModal] = useState(false);
+  const [arsiparisPassInput, setArsiparisPassInput] = useState('');
+  const [rememberArsiparisPass, setRememberArsiparisPass] = useState(true);
+  const [arsiparisAuthError, setArsiparisAuthError] = useState('');
 
   // ====== STATE PERAN & NAVIGASI ======
-  const [role, setRole] = useState('arsiparis'); // 'arsiparis' | 'peminjam'
+  const [role, setRole] = useState('peminjam'); // 'arsiparis' | 'peminjam'
   const [arsiparisTab, setArsiparisTab] = useState('perkara'); // 'perkara' | 'arsip' | 'peminjaman'
   const [searchQuery, setSearchQuery] = useState('');
   const [peminjamStatusFilter, setPeminjamStatusFilter] = useState('semua'); // 'semua' | 'Terarsip' | 'Dipinjam'
-  const [page, setPage] = useState(1);
+  const filterKey = `${role}|${arsiparisTab}|${searchQuery}|${peminjamStatusFilter}`;
+  const [pageState, setPageState] = useState({ key: '', page: 1 });
+  const page = pageState.key === filterKey ? pageState.page : 1;
+  const setPage = (nextPage) => setPageState({ key: filterKey, page: nextPage });
 
   // ====== STATE DATA ======
   const [perkaraList, setPerkaraList] = useState([]);
@@ -233,14 +256,11 @@ export default function App() {
 
   const urlReady = isConfiguredUrl(gasUrl);
 
+  const waTriggerRef = useRef(null);
+
   const showToast = useCallback((type, text, waUrl = '') => {
     setFeedback({ type, text, waUrl });
   }, []);
-
-  // Reset pagination when filters/tabs/roles change
-  useEffect(() => {
-    setPage(1);
-  }, [role, arsiparisTab, searchQuery, peminjamStatusFilter]);
 
   // ====== FETCH DATA (GET) ======
   const fetchData = useCallback(
@@ -275,7 +295,10 @@ export default function App() {
   );
 
   useEffect(() => {
-    fetchData();
+    const id = setTimeout(() => {
+      fetchData();
+    }, 0);
+    return () => clearTimeout(id);
   }, [fetchData]);
 
   // ====== POST ACTION (Content-Type: text/plain;charset=utf-8 untuk hindari CORS preflight) ======
@@ -430,6 +453,47 @@ export default function App() {
     await fetchData(cleaned);
   };
 
+  const handleSaveWa = (e) => {
+    e.preventDefault();
+    const normalized = normalizeWaNumber(waInput);
+    if (!/^62\d{8,14}$/.test(normalized)) {
+      showToast('error', 'Nomor WhatsApp tidak valid. Gunakan format +628... atau 08...');
+      return;
+    }
+    localStorage.setItem(STORAGE_KEY_WA, normalized);
+    setWaNumber(normalized);
+    setShowWaModal(false);
+    showToast('success', `Nomor WhatsApp Arsiparis diperbarui ke +${normalized}.`);
+  };
+
+  const handleSelectArsiparis = () => {
+    if (isArsiparisAuthed) {
+      setRole('arsiparis');
+      return;
+    }
+    setArsiparisPassInput(localStorage.getItem(STORAGE_KEY_ARSIPARIS_PASS) || '');
+    setArsiparisAuthError('');
+    setShowArsiparisAuthModal(true);
+  };
+
+  const handleArsiparisLogin = (e) => {
+    e.preventDefault();
+    if (arsiparisPassInput !== DEFAULT_ARSIPARIS_PASS) {
+      setArsiparisAuthError('Password salah. Silakan coba lagi.');
+      return;
+    }
+    if (rememberArsiparisPass) {
+      localStorage.setItem(STORAGE_KEY_ARSIPARIS_PASS, arsiparisPassInput);
+    } else {
+      localStorage.removeItem(STORAGE_KEY_ARSIPARIS_PASS);
+    }
+    setIsArsiparisAuthed(true);
+    setShowArsiparisAuthModal(false);
+    setArsiparisPassInput('');
+    setArsiparisAuthError('');
+    setRole('arsiparis');
+  };
+
   const handleAddPerkaraSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -517,12 +581,17 @@ export default function App() {
         `Tanggal Pinjam: ${borrowForm.tanggalPinjam}`,
         `Keterangan: ${borrowForm.keterangan || '-'}`
       ].join('\n');
+      const waUrl = buildWaLink(waMessage, waNumber);
       setBorrowTarget(null);
       showToast(
         'success',
         `Berkas ${borrowTarget.nomorPerkara} berhasil dipinjam oleh ${borrowForm.peminjam}.`,
-        buildWaLink(waMessage)
+        waUrl
       );
+      if (waTriggerRef.current) {
+        waTriggerRef.current.href = waUrl;
+        waTriggerRef.current.click();
+      }
     } catch (err) {
       showToast('error', err.message);
     }
@@ -552,12 +621,17 @@ export default function App() {
         `Tanggal Kembali: ${returnDate}`,
         'Status: Terarsip (Sudah Dikembalikan)'
       ].join('\n');
+      const waUrl = buildWaLink(waMessage, waNumber);
       setReturnTarget(null);
       showToast(
         'success',
         `Berkas ${returnTarget.nomorPerkara} telah dikembalikan dan berstatus Terarsip.`,
-        buildWaLink(waMessage)
+        waUrl
       );
+      if (waTriggerRef.current) {
+        waTriggerRef.current.href = waUrl;
+        waTriggerRef.current.click();
+      }
     } catch (err) {
       showToast('error', err.message);
     }
@@ -597,7 +671,7 @@ export default function App() {
           <nav aria-label="Pilih Peran Pengguna" className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-100 p-1">
             <button
               type="button"
-              onClick={() => setRole('arsiparis')}
+              onClick={handleSelectArsiparis}
               className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
                 role === 'arsiparis'
                   ? 'bg-white text-slate-900 shadow-xs'
@@ -617,24 +691,40 @@ export default function App() {
               }`}
             >
               <BookOpen className="h-3.5 w-3.5" />
-              <span>Peminjam</span>
+              <span>Peminjaman</span>
             </button>
           </nav>
 
-          {/* Zone 3: Refresh & Konfigurasi */}
+          {/* Zone 3: WA Arsiparis, URL API & Refresh */}
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => {
-                setConfigInput(gasUrl === DEFAULT_GAS_URL ? '' : gasUrl);
-                setShowConfigModal(true);
-              }}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 whitespace-nowrap shrink-0"
-              title="Konfigurasi URL Google Apps Script"
-            >
-              <Settings className="h-3.5 w-3.5 text-slate-500" />
-              <span className="hidden sm:inline">URL API</span>
-            </button>
+            {role === 'arsiparis' && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWaInput(waNumber);
+                    setShowWaModal(true);
+                  }}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 whitespace-nowrap shrink-0"
+                  title="Ubah Nomor WhatsApp Arsiparis"
+                >
+                  <Phone className="h-3.5 w-3.5 text-slate-500" />
+                  <span className="hidden sm:inline">WA Arsiparis</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfigInput(gasUrl === DEFAULT_GAS_URL ? '' : gasUrl);
+                    setShowConfigModal(true);
+                  }}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 whitespace-nowrap shrink-0"
+                  title="Konfigurasi URL Google Apps Script"
+                >
+                  <Settings className="h-3.5 w-3.5 text-slate-500" />
+                  <span className="hidden sm:inline">URL API</span>
+                </button>
+              </>
+            )}
             <button
               type="button"
               onClick={() => fetchData()}
@@ -726,8 +816,8 @@ export default function App() {
             </p>
             <h1 className="mt-1 font-display text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
               {role === 'arsiparis'
-                ? 'Manajemen Arsip Perkara Pengadilan'
-                : 'Katalog & Sirkulasi Peminjaman Arsip'}
+                ? 'Manajemen Arsip Perkara'
+                : 'Katalog Peminjaman Arsip'}
             </h1>
             <p className="mt-1 text-sm text-slate-600">
               {role === 'arsiparis'
@@ -1204,6 +1294,121 @@ export default function App() {
         </ModalShell>
       )}
 
+      {/* ====== MODAL 1B: UBAH NOMOR WHATSAPP ARSIPARIS ====== */}
+      {showWaModal && (
+        <ModalShell
+          title="Nomor WhatsApp Arsiparis"
+          subtitle="Nomor tujuan notifikasi WhatsApp setelah form Peminjaman dan Kembalikan dikirim."
+          maxWidth="max-w-md"
+          onClose={() => setShowWaModal(false)}
+        >
+          <form onSubmit={handleSaveWa} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Nomor WhatsApp Arsiparis
+              </label>
+              <input
+                type="tel"
+                required
+                value={waInput}
+                onChange={(e) => setWaInput(e.target.value)}
+                placeholder="Contoh: 6285737441360 atau 085737441360"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm text-slate-900 focus:border-slate-900 focus:outline-none"
+              />
+              <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">
+                Nomor aktif saat ini: <strong className="font-mono text-slate-800">+{waNumber}</strong>. Awalan 0 otomatis dikonversi ke 62.
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowWaModal(false)}
+                className="h-9 rounded-lg border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                className="h-9 rounded-lg bg-slate-900 px-4 text-xs font-semibold text-white hover:bg-slate-800"
+              >
+                Simpan Nomor WA
+              </button>
+            </div>
+          </form>
+        </ModalShell>
+      )}
+
+      {/* ====== MODAL 1C: PASSWORD MASUK ARSIPARIS ====== */}
+      {showArsiparisAuthModal && (
+        <ModalShell
+          title="Masuk Halaman Arsiparis"
+          subtitle="Masukkan password Arsiparis untuk mengelola data perkara dan arsip."
+          maxWidth="max-w-sm"
+          onClose={() => setShowArsiparisAuthModal(false)}
+        >
+          <form onSubmit={handleArsiparisLogin} autoComplete="on" className="space-y-4">
+            <input
+              type="text"
+              name="username"
+              value="arsiparis"
+              autoComplete="username"
+              readOnly
+              className="sr-only"
+              tabIndex={-1}
+            />
+            <div>
+              <label htmlFor="arsiparis-password" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Password Arsiparis
+              </label>
+              <input
+                id="arsiparis-password"
+                name="password"
+                type="password"
+                required
+                autoFocus
+                autoComplete="current-password"
+                value={arsiparisPassInput}
+                onChange={(e) => {
+                  setArsiparisPassInput(e.target.value);
+                  if (arsiparisAuthError) setArsiparisAuthError('');
+                }}
+                placeholder="Masukkan password"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-900 focus:outline-none"
+              />
+              {arsiparisAuthError && (
+                <p className="mt-1.5 text-xs font-medium text-red-600">{arsiparisAuthError}</p>
+              )}
+            </div>
+
+            <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={rememberArsiparisPass}
+                onChange={(e) => setRememberArsiparisPass(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+              />
+              <span>Simpan password di browser</span>
+            </label>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowArsiparisAuthModal(false)}
+                className="h-9 rounded-lg border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                className="h-9 rounded-lg bg-slate-900 px-4 text-xs font-semibold text-white hover:bg-slate-800"
+              >
+                Masuk
+              </button>
+            </div>
+          </form>
+        </ModalShell>
+      )}
+
       {/* ====== MODAL 2: TAMBAH PERKARA BARU ====== */}
       {showAddPerkaraModal && (
         <ModalShell
@@ -1665,10 +1870,11 @@ export default function App() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-slate-900 px-4 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-700 px-4 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
               >
                 {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                <span>{submitting ? 'Mencatat...' : 'Catat Peminjaman'}</span>
+                <span>{submitting ? 'Mencatat...' : 'Pinjam'}</span>
+                {!submitting && <ArrowUpRight className="h-3.5 w-3.5" />}
               </button>
             </div>
           </form>
@@ -1730,15 +1936,26 @@ export default function App() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-slate-900 px-4 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-700 px-4 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
               >
                 {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                <span>{submitting ? 'Memproses...' : 'Konfirmasi Kembalikan'}</span>
+                <span>{submitting ? 'Memproses...' : 'Kembalikan'}</span>
+                {!submitting && <ArrowUpRight className="h-3.5 w-3.5" />}
               </button>
             </div>
           </form>
         </ModalShell>
       )}
+
+      <a
+        ref={waTriggerRef}
+        href={`https://wa.me/${waNumber}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="hidden"
+        aria-hidden="true"
+        tabIndex={-1}
+      />
     </div>
   );
 }
