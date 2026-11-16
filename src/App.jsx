@@ -536,6 +536,7 @@ export default function App() {
     if (!archiveTarget) return;
     try {
       await postAction('arsipkanPerkara', {
+        arsipID: archiveTarget.abstraksiID,
         abstraksiID: archiveTarget.abstraksiID,
         nomorPerkara: archiveTarget.nomorPerkara,
         jenisPerkara: archiveTarget.jenisPerkara,

@@ -159,7 +159,7 @@ function doPost(e) {
         return jsonResponse_({ status: 'error', message: 'Data perkara dengan ID ' + d.abstraksiID + ' tidak ditemukan atau sudah diarsipkan.' });
       }
 
-      var arsipID = d.arsipID || 'ARS-' + Date.now();
+      var arsipID = d.abstraksiID;
       sheetArsip.appendRow([
         arsipID,
         d.nomorPerkara || '',
