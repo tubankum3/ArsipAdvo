@@ -32,6 +32,11 @@ import {
 const DEFAULT_GAS_URL = 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL';
 const STORAGE_KEY_URL = 'arsip_perkara_gas_url';
 const ITEMS_PER_PAGE = 10;
+const WA_NUMBER = '6285737441360';
+
+function buildWaLink(message) {
+  return `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(message)}`;
+}
 
 function getTodayISO() {
   const now = new Date();
@@ -228,8 +233,8 @@ export default function App() {
 
   const urlReady = isConfiguredUrl(gasUrl);
 
-  const showToast = useCallback((type, text) => {
-    setFeedback({ type, text });
+  const showToast = useCallback((type, text, waUrl = '') => {
+    setFeedback({ type, text, waUrl });
   }, []);
 
   // Reset pagination when filters/tabs/roles change
@@ -503,8 +508,21 @@ export default function App() {
         tanggalPinjam: borrowForm.tanggalPinjam,
         keterangan: borrowForm.keterangan
       });
+      const waMessage = [
+        '*Notifikasi Peminjaman Arsip Perkara*',
+        `Nomor Perkara: ${borrowTarget.nomorPerkara || '-'}`,
+        `Arsip ID: ${borrowTarget.arsipID || '-'}`,
+        `Lokasi / Boks: ${borrowTarget.lokasiSimpan || '-'} (${borrowTarget.boksFolder || '-'})`,
+        `Peminjam: ${borrowForm.peminjam}`,
+        `Tanggal Pinjam: ${borrowForm.tanggalPinjam}`,
+        `Keterangan: ${borrowForm.keterangan || '-'}`
+      ].join('\n');
       setBorrowTarget(null);
-      showToast('success', `Berkas ${borrowTarget.nomorPerkara} berhasil dipinjam oleh ${borrowForm.peminjam}.`);
+      showToast(
+        'success',
+        `Berkas ${borrowTarget.nomorPerkara} berhasil dipinjam oleh ${borrowForm.peminjam}.`,
+        buildWaLink(waMessage)
+      );
     } catch (err) {
       showToast('error', err.message);
     }
@@ -525,8 +543,21 @@ export default function App() {
         peminjamanID: activeLoan ? activeLoan.peminjamanID : '',
         tanggalKembali: returnDate
       });
+      const waMessage = [
+        '*Notifikasi Pengembalian Arsip Perkara*',
+        `Nomor Perkara: ${returnTarget.nomorPerkara || '-'}`,
+        `Arsip ID: ${returnTarget.arsipID || '-'}`,
+        `Peminjam: ${activeLoan ? activeLoan.peminjam : '-'}`,
+        `Tanggal Pinjam: ${activeLoan ? activeLoan.tanggalPinjam : '-'}`,
+        `Tanggal Kembali: ${returnDate}`,
+        'Status: Terarsip (Sudah Dikembalikan)'
+      ].join('\n');
       setReturnTarget(null);
-      showToast('success', `Berkas ${returnTarget.nomorPerkara} telah dikembalikan dan berstatus Terarsip.`);
+      showToast(
+        'success',
+        `Berkas ${returnTarget.nomorPerkara} telah dikembalikan dan berstatus Terarsip.`,
+        buildWaLink(waMessage)
+      );
     } catch (err) {
       showToast('error', err.message);
     }
@@ -649,7 +680,7 @@ export default function App() {
         {feedback && (
           <div
             role="status"
-            className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm ${
+            className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm ${
               feedback.type === 'error'
                 ? 'border-red-200 bg-red-50 text-red-900'
                 : 'border-emerald-200 bg-emerald-50 text-emerald-900'
@@ -663,14 +694,27 @@ export default function App() {
               )}
               <span>{feedback.text}</span>
             </div>
-            <button
-              type="button"
-              onClick={() => setFeedback(null)}
-              className="rounded p-1 opacity-70 hover:opacity-100"
-              aria-label="Tutup notifikasi"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              {feedback.waUrl && (
+                <a
+                  href={feedback.waUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-emerald-700 px-3 text-xs font-semibold text-white transition-colors hover:bg-emerald-800 whitespace-nowrap"
+                >
+                  <span>Kirim ke WhatsApp</span>
+                  <ArrowUpRight className="h-3.5 w-3.5" />
+                </a>
+              )}
+              <button
+                type="button"
+                onClick={() => setFeedback(null)}
+                className="rounded p-1 opacity-70 hover:opacity-100"
+                aria-label="Tutup notifikasi"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         )}
 
