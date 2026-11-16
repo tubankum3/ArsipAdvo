@@ -792,7 +792,7 @@ export default function App() {
                   rel="noopener noreferrer"
                   className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-emerald-700 px-3 text-xs font-semibold text-white transition-colors hover:bg-emerald-800 whitespace-nowrap"
                 >
-                  <span>Kirim ke WhatsApp</span>
+                  <span>Kirim ke Whatsapp Arsiparis</span>
                   <ArrowUpRight className="h-3.5 w-3.5" />
                 </a>
               )}
